@@ -98,6 +98,14 @@ https://pan.xxx.com/home?path=cloudreve%3A%2F%2Fxxxxx%40share
 
 > **支持任意 Cloudreve v4 站点**，不限于特定域名。
 
+### 兼容的站点示例
+
+| 站点 | 地址 | 说明 |
+|------|------|------|
+| NekoGAL | https://www.nekogal.com/ | Galgame 资源分享站 |
+
+> 任何使用 Cloudreve v4 的站点都可以使用本工具下载。
+
 ### 单文件分享
 
 1. 粘贴分享链接
