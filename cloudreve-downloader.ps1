@@ -38,7 +38,7 @@ param(
     [int]$Aria2Connections = 0
 )
 
-$script:Version = "3.0.0"
+$script:Version = "3.1.0"
 # Auto-detect script directory (works wherever the user places the folder)
 $script:BaseDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 if (-not $script:BaseDir) {
@@ -52,6 +52,20 @@ $script:ActiveDownloads = @()
 $script:Logger = $null
 
 $ErrorActionPreference = "Stop"
+
+# ==================== Environment Compatibility ====================
+# Fix console encoding to prevent garbled text and header issues
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
+# Enable modern TLS (some systems default to TLS 1.0)
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+
+# Check PowerShell version (5.1+ required for some features)
+if ($PSVersionTable.PSVersion.Major -lt 5) {
+    Write-Host "[ERR]  PowerShell 5.1 or higher required. Current: $($PSVersionTable.PSVersion)" -ForegroundColor Red
+    exit 1
+}
 
 # ==================== Logger ====================
 class DownloaderLogger {
@@ -110,6 +124,17 @@ function Load-Config {
         Save-Config
     }
     $script:Logger = [DownloaderLogger]::new($script:LogDir, $script:Config.logEnabled)
+    
+    # Ensure temp directory exists (critical for aria2)
+    if (-not (Test-Path $script:TempDir)) {
+        try {
+            New-Item -ItemType Directory -Path $script:TempDir -Force | Out-Null
+            Write-Info "Created temp directory: $($script:TempDir)"
+        } catch {
+            Write-Err "Failed to create temp directory: $($script:TempDir). Check permissions."
+            exit 1
+        }
+    }
 }
 
 function Get-DefaultConfig {
@@ -134,8 +159,8 @@ $script:Aria2Path = $null
 
 function Test-Aria2Installed {
     try {
-        $script:Aria2Path = (Get-Command aria2c -ErrorAction Stop).Source
-        return $true
+        $cmd = Get-Command aria2c -ErrorAction Stop
+        $script:Aria2Path = $cmd.Source
     } catch {
         $paths = @(
             "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\aria2.aria2_Microsoft.Winget.Source_8wekyb3d8bbwe"
@@ -148,10 +173,23 @@ function Test-Aria2Installed {
                 $exe = Get-ChildItem -Path $p -Filter "aria2c.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($exe) {
                     $script:Aria2Path = $exe.FullName
-                    return $true
+                    break
                 }
             }
         }
+    }
+    
+    if (-not $script:Aria2Path -or -not (Test-Path $script:Aria2Path)) {
+        return $false
+    }
+    
+    # Verify aria2 version and functionality
+    try {
+        $versionOutput = & $script:Aria2Path --version 2>&1 | Select-Object -First 1
+        Write-Info "aria2 version: $versionOutput"
+        return $true
+    } catch {
+        Write-Warn "aria2 found but cannot execute: $_"
         return $false
     }
 }
@@ -265,6 +303,56 @@ function Get-DownloadUrl {
     return $null
 }
 
+# ==================== Network Diagnostics ====================
+function Test-UrlAccessibility {
+    param([string]$url, [string]$referer)
+
+    Write-Info "Testing URL accessibility..."
+    try {
+        $req = [System.Net.WebRequest]::Create($url)
+        # Use GET instead of HEAD - some S3-compatible storage returns 403 on HEAD but 200 on GET
+        $req.Method = "GET"
+        $req.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+        $req.Referer = $referer
+        $req.Timeout = 15000
+        $req.AllowAutoRedirect = $true
+        # Abort immediately after receiving headers to avoid downloading the full file
+        $req.AddRange(0, 0)
+
+        $response = $req.GetResponse()
+        $status = [int]$response.StatusCode
+        $response.Close()
+
+        if ($status -eq 200 -or $status -eq 206 -or $status -eq 302 -or $status -eq 307) {
+            Write-Success "URL is accessible (HTTP $status)"
+            return $true
+        } else {
+            Write-Warn "URL returned HTTP $status"
+            return $false
+        }
+    } catch [System.Net.WebException] {
+        $statusCode = $null
+        if ($_.Exception.Response) {
+            $statusCode = [int]$_.Exception.Response.StatusCode
+        }
+        $errorMsg = $_.Exception.Message
+
+        if ($statusCode -eq 403) {
+            Write-Info "URL pre-check returned HTTP 403 (this is normal for some storage backends). Will attempt download anyway."
+        } elseif ($statusCode -eq 401) {
+            Write-Warn "URL blocked: HTTP 401 (Unauthorized). The download token may have expired."
+        } elseif ($errorMsg -match "SSL" -or $errorMsg -match "TLS") {
+            Write-Warn "TLS/SSL error: $errorMsg. Try updating .NET Framework or enabling TLS 1.2."
+        } else {
+            Write-Warn "URL test failed: $errorMsg"
+        }
+        return $false
+    } catch {
+        Write-Warn "URL test failed: $_"
+        return $false
+    }
+}
+
 # ==================== Helpers ====================
 function Format-Size {
     param([long]$size)
@@ -303,7 +391,7 @@ function Show-Progress {
 
 # ==================== Download with Progress ====================
 function Start-FileDownload {
-    param([string]$url, [string]$outPath, [long]$fileSize, [int]$conn = 16)
+    param([string]$url, [string]$outPath, [long]$fileSize, [int]$conn = 16, [string]$domain = "")
     
     $tempName = [Guid]::NewGuid().ToString("N") + ".tmp"
     # Use relative path for aria2 to avoid path duplication issues
@@ -312,7 +400,13 @@ function Start-FileDownload {
     $tempPath = Join-Path $script:BaseDir $relativeTemp
     $ariaLog = Join-Path $script:BaseDir $relativeLog
     
-    # Build aria2 args with log file for debugging
+    # Pre-flight check: test if URL is accessible with browser headers
+    $urlAccessible = Test-UrlAccessibility -url $url -referer $domain
+    # Note: pre-check failures (e.g. 403 on GET range) are often false positives for S3/R2 storage.
+    # The actual download will still be attempted regardless.
+    
+    # Build aria2 args with browser-like headers to avoid WAF blocking
+    # Values containing spaces MUST be quoted for aria2 to parse correctly
     $ariaArgs = @(
         "-x", "$conn",
         "-s", "$conn",
@@ -321,11 +415,24 @@ function Start-FileDownload {
         "--disk-cache=64M",
         "--max-connection-per-server=$conn",
         "--min-split-size=1M",
-        "--log-level=debug",
+        "--log-level=notice",
         "--log=$relativeLog",
         "--out", "$relativeTemp",
+        # Browser-like headers to avoid being blocked by R2/WAF
+        '--user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"',
+        '--header="Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"',
+        '--header="Accept-Language: zh-CN,zh;q=0.9,en;q=0.8"',
+        '--header="Accept-Encoding: gzip, deflate, br"',
+        '--header="DNT: 1"',
+        "--check-certificate=true",
+        "--async-dns=false",
         "$url"
     )
+
+    # Add referer if domain is available (some storage requires it)
+    if ($domain) {
+        $ariaArgs += "--referer=$domain"
+    }
     
     # Add proxy if configured
     if ($script:Config.proxy -and $script:Config.proxy -ne "") {
@@ -335,24 +442,38 @@ function Start-FileDownload {
     Write-Info "Starting download..."
     $script:Logger.Info("Download started: $url -> $tempPath")
     
-    # Start aria2 process with visible window for error debugging
+    # Start aria2 process with captured output for diagnostics
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $script:Aria2Path
     $psi.Arguments = $ariaArgs -join " "
     $psi.WorkingDirectory = $script:BaseDir
-    $psi.RedirectStandardOutput = $false
-    $psi.RedirectStandardError = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+    $psi.StandardErrorEncoding = [System.Text.Encoding]::UTF8
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
     
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $psi
     
+    # Collect output asynchronously
+    $stdOut = [System.Text.StringBuilder]::new()
+    $stdErr = [System.Text.StringBuilder]::new()
+    
+    $outHandler = { $stdOut.AppendLine($EventArgs.Data) | Out-Null }
+    $errHandler = { $stdErr.AppendLine($EventArgs.Data) | Out-Null }
+    
+    Register-ObjectEvent -InputObject $process -EventName OutputDataReceived -Action $outHandler | Out-Null
+    Register-ObjectEvent -InputObject $process -EventName ErrorDataReceived -Action $errHandler | Out-Null
+    
     # Track progress
     $startTime = Get-Date
     
     # Start process
     [void]$process.Start()
+    $process.BeginOutputReadLine()
+    $process.BeginErrorReadLine()
     $script:ActiveDownloads += $process
     
     # Monitor progress
@@ -376,21 +497,30 @@ function Start-FileDownload {
         Start-Sleep -Milliseconds 500
     }
     
+    # Give a moment for final output events to fire
+    Start-Sleep -Milliseconds 300
+    
     $script:ActiveDownloads = $script:ActiveDownloads | Where-Object { $_ -ne $process }
     Write-Host ""  # New line after progress bar
     
     # Read aria2 log for error details
     $errorDetails = ""
+    $logPreserved = $false
+    
     if (Test-Path $ariaLog) {
         try {
-            $logContent = Get-Content $ariaLog -Tail 20 -ErrorAction SilentlyContinue
-            $errorLines = $logContent | Where-Object { $_ -match "ERROR|WARN|error|failed" } | Select-Object -Last 5
+            $logContent = Get-Content $ariaLog -Tail 30 -ErrorAction SilentlyContinue
+            $errorLines = $logContent | Where-Object { $_ -match "ERROR|WARN|error|failed|exception" } | Select-Object -Last 10
             if ($errorLines) {
                 $errorDetails = $errorLines -join "`n"
             }
-            # Clean up log file
-            Remove-Item $ariaLog -Force -ErrorAction SilentlyContinue
         } catch {}
+    }
+    
+    # Also capture direct stderr
+    $stderrText = $stdErr.ToString().Trim()
+    if ($stderrText) {
+        $errorDetails += "`n[Direct stderr]:`n$stderrText"
     }
     
     if ($process.ExitCode -eq 0 -and (Test-Path $tempPath)) {
@@ -400,10 +530,13 @@ function Start-FileDownload {
             if (Test-Path $outPath) { Remove-Item $outPath -Force }
             Move-Item -Path $tempPath -Destination $outPath -Force
             $script:Logger.Success("Download completed: $outPath")
+            # Clean up log on success
+            if (Test-Path $ariaLog) { Remove-Item $ariaLog -Force -ErrorAction SilentlyContinue }
             return 0
         } else {
             Write-Warn "Download size mismatch: expected $fileSize, got $actualSize"
             if (Test-Path $tempPath) { Remove-Item $tempPath -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $ariaLog) { Remove-Item $ariaLog -Force -ErrorAction SilentlyContinue }
             return 1
         }
     } else {
@@ -413,8 +546,22 @@ function Start-FileDownload {
             Write-Host $errorDetails -ForegroundColor DarkGray
             $script:Logger.Error("aria2 error: $errorDetails")
         }
+        
+        # Preserve diagnostic log on failure for troubleshooting
+        $diagnosticLog = Join-Path $script:LogDir "aria2-failed-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+        if (Test-Path $ariaLog) {
+            try {
+                Copy-Item $ariaLog $diagnosticLog -Force -ErrorAction SilentlyContinue
+                Write-Info "Diagnostic log saved: $diagnosticLog"
+                $logPreserved = $true
+            } catch {}
+        }
+        
         if (Test-Path $tempPath) {
             Remove-Item $tempPath -Force -ErrorAction SilentlyContinue
+        }
+        if (Test-Path $ariaLog) {
+            Remove-Item $ariaLog -Force -ErrorAction SilentlyContinue
         }
         return $process.ExitCode
     }
@@ -562,7 +709,7 @@ foreach ($file in $selected) {
             continue
         }
         
-        $code = Start-FileDownload -url $url -outPath $out -fileSize $file.size -conn $Aria2Connections
+        $code = Start-FileDownload -url $url -outPath $out -fileSize $file.size -conn $Aria2Connections -domain $domain
         
         if ($code -eq 0 -and (Test-Path $out) -and (Get-Item $out).Length -eq $file.size) {
             Write-Success "Done: $name"
