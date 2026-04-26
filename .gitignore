@@ -1,0 +1,22 @@
+# Downloaded files
+downloads/*
+!downloads/.gitkeep
+
+# Temporary files
+temp/*
+!temp/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# User config (optional - if you want users to create their own)
+# config.json
