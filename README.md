@@ -103,6 +103,7 @@ cd C:\CloudreveDownloader
 https://pan.nekogal.top/s/xxxxx
 https://pan.nekogal.top/s/xxxxx/password
 https://pan.nekogal.top/home?path=cloudreve%3A%2F%2Fxxxxx%40share
+https://share.nekogal.top/home?path=cloudreve%3A%2F%2Fxxxxx%40share
 ```
 
 **通用 Cloudreve v4 格式：**

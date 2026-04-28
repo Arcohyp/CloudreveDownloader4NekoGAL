@@ -594,6 +594,8 @@ if ($Aria2Connections -eq 0) { $Aria2Connections = $script:Config.defaultConnect
 if (-not $ShareLink) {
     Write-Host "Paste Cloudreve share link:" -ForegroundColor Cyan
     Write-Host "  Example: https://pan.xxx.com/s/xxxxx" -ForegroundColor Gray
+    Write-Host "          https://pan.nekogal.top/home?path=cloudreve%3A%2F%2Fxxxxx%40share" -ForegroundColor Gray
+    Write-Host "          https://share.nekogal.top/home?path=cloudreve%3A%2F%2Fxxxxx%40share" -ForegroundColor Gray
     $ShareLink = Read-Host "Link"
 }
 if (-not $ShareLink) { Write-Err "No link provided"; exit 1 }
