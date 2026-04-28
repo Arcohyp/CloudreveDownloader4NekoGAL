@@ -38,7 +38,7 @@ param(
     [int]$Aria2Connections = 0
 )
 
-$script:Version = "3.1.0"
+$script:Version = "3.1.2"
 # Auto-detect script directory (works wherever the user places the folder)
 $script:BaseDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 if (-not $script:BaseDir) {
@@ -303,6 +303,33 @@ function Get-DownloadUrl {
     return $null
 }
 
+function Expand-FileList {
+    param([string]$shareId, [string]$domain, [string]$basePath = "")
+    $results = @()
+    $uriSuffix = if ($basePath) { "/$basePath/" } else { "/" }
+    $uri = [System.Uri]::EscapeDataString("cloudreve://$shareId@share$uriSuffix")
+    try {
+        $r = Invoke-RestMethod -Uri "$domain/api/v4/file?uri=$uri" -TimeoutSec 30
+        if ($r.code -eq 0 -and $r.data -and $r.data.files) {
+            foreach ($f in $r.data.files) {
+                if ($f.type -eq 1) {
+                    # Directory: recurse
+                    $subPath = if ($basePath) { "$basePath/$($f.name)" } else { $f.name }
+                    $subFiles = Expand-FileList -shareId $shareId -domain $domain -basePath $subPath
+                    $results += $subFiles
+                } else {
+                    # File: add relative path prefix for subfolders
+                    if ($basePath) {
+                        $f | Add-Member -NotePropertyName '_relativePath' -NotePropertyValue $basePath -Force
+                    }
+                    $results += $f
+                }
+            }
+        }
+    } catch { Write-Warn "Failed to expand directory '$basePath': $_" }
+    return ,$results
+}
+
 # ==================== Network Diagnostics ====================
 function Test-UrlAccessibility {
     param([string]$url, [string]$referer)
@@ -370,6 +397,27 @@ function Format-Speed {
     return "$bytesPerSec B/s"
 }
 
+function Sanitize-FileName {
+    param([string]$name)
+    # Replace Windows reserved characters
+    $invalid = [System.IO.Path]::GetInvalidFileNameChars()
+    foreach ($c in $invalid) {
+        $name = $name.Replace([string]$c, "_")
+    }
+    # Trim trailing dots and spaces which Windows doesn't allow
+    $name = $name.TrimEnd(" .")
+    # Handle Windows reserved names
+    $reserved = @("CON","PRN","AUX","NUL") + (1..9 | ForEach-Object { "COM$_"; "LPT$_" })
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($name)
+    if ($reserved -contains $baseName.ToUpper()) {
+        $ext = [System.IO.Path]::GetExtension($name)
+        $name = "_" + $baseName + $ext
+    }
+    # Prevent empty names
+    if ([string]::IsNullOrWhiteSpace($name)) { $name = "unnamed" }
+    return $name
+}
+
 # ==================== Progress Bar ====================
 function Show-Progress {
     param(
@@ -393,20 +441,29 @@ function Show-Progress {
 function Start-FileDownload {
     param([string]$url, [string]$outPath, [long]$fileSize, [int]$conn = 16, [string]$domain = "")
     
-    $tempName = [Guid]::NewGuid().ToString("N") + ".tmp"
-    # Use relative path for aria2 to avoid path duplication issues
-    $relativeTemp = "temp\$tempName"
-    $relativeLog = "temp\$tempName.aria2.log"
-    $tempPath = Join-Path $script:BaseDir $relativeTemp
+    $outDir = Split-Path $outPath -Parent
+    $fileName = Split-Path $outPath -Leaf
+    $tempFileName = $fileName + ".tmp"
+    $tempPath = Join-Path $outDir $tempFileName
+    $aria2CtrlFile = Join-Path $outDir ($tempFileName + ".aria2")
+    
+    # Log still goes to temp dir with random name
+    $logName = [Guid]::NewGuid().ToString("N") + ".aria2.log"
+    $relativeLog = "temp\$logName"
     $ariaLog = Join-Path $script:BaseDir $relativeLog
+    
+    # Check for incomplete download (aria2 control file exists)
+    $resume = $false
+    if (Test-Path $aria2CtrlFile) {
+        $ctrlSize = if (Test-Path $tempPath) { (Get-Item $tempPath).Length } else { 0 }
+        Write-Info "Resuming download ($([math]::Round($ctrlSize/1MB,2)) MB already downloaded)..."
+        $resume = $true
+    }
     
     # Pre-flight check: test if URL is accessible with browser headers
     $urlAccessible = Test-UrlAccessibility -url $url -referer $domain
-    # Note: pre-check failures (e.g. 403 on GET range) are often false positives for S3/R2 storage.
-    # The actual download will still be attempted regardless.
     
-    # Build aria2 args with browser-like headers to avoid WAF blocking
-    # Values containing spaces MUST be quoted for aria2 to parse correctly
+    # Build aria2 args
     $ariaArgs = @(
         "-x", "$conn",
         "-s", "$conn",
@@ -417,7 +474,8 @@ function Start-FileDownload {
         "--min-split-size=1M",
         "--log-level=notice",
         "--log=$relativeLog",
-        "--out", "$relativeTemp",
+        "--dir", "$outDir",
+        "--out", "$tempFileName",
         # Browser-like headers to avoid being blocked by R2/WAF
         '--user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"',
         '--header="Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"',
@@ -425,9 +483,15 @@ function Start-FileDownload {
         '--header="Accept-Encoding: gzip, deflate, br"',
         '--header="DNT: 1"',
         "--check-certificate=true",
-        "--async-dns=false",
-        "$url"
+        "--async-dns=false"
     )
+    
+    # Enable resume if control file exists
+    if ($resume) {
+        $ariaArgs += "--continue=true"
+    }
+    
+    $ariaArgs += "$url"
 
     # Add referer if domain is available (some storage requires it)
     if ($domain) {
@@ -440,7 +504,7 @@ function Start-FileDownload {
     }
     
     Write-Info "Starting download..."
-    $script:Logger.Info("Download started: $url -> $tempPath")
+    $script:Logger.Info("Download started: $url -> $outPath")
     
     # Start aria2 process with captured output for diagnostics
     $psi = New-Object System.Diagnostics.ProcessStartInfo
@@ -488,7 +552,7 @@ function Start-FileDownload {
                     $elapsed = ((Get-Date) - $startTime).TotalSeconds
                     if ($elapsed -gt 0) {
                         $speed = [long]($currentSize / $elapsed)
-                        Show-Progress -Current $currentSize -Total $fileSize -Speed $speed -FileName (Split-Path $outPath -Leaf)
+                        Show-Progress -Current $currentSize -Total $fileSize -Speed $speed -FileName $fileName
                     }
                 }
             } catch {}
@@ -530,12 +594,17 @@ function Start-FileDownload {
             if (Test-Path $outPath) { Remove-Item $outPath -Force }
             Move-Item -Path $tempPath -Destination $outPath -Force
             $script:Logger.Success("Download completed: $outPath")
-            # Clean up log on success
+            # Clean up temp artifacts on success
+            if (Test-Path $aria2CtrlFile) { Remove-Item $aria2CtrlFile -Force -ErrorAction SilentlyContinue }
             if (Test-Path $ariaLog) { Remove-Item $ariaLog -Force -ErrorAction SilentlyContinue }
             return 0
         } else {
             Write-Warn "Download size mismatch: expected $fileSize, got $actualSize"
-            if (Test-Path $tempPath) { Remove-Item $tempPath -Force -ErrorAction SilentlyContinue }
+            # Keep temp file for potential resume if size is reasonable
+            if ($actualSize -lt 1MB) {
+                if (Test-Path $tempPath) { Remove-Item $tempPath -Force -ErrorAction SilentlyContinue }
+                if (Test-Path $aria2CtrlFile) { Remove-Item $aria2CtrlFile -Force -ErrorAction SilentlyContinue }
+            }
             if (Test-Path $ariaLog) { Remove-Item $ariaLog -Force -ErrorAction SilentlyContinue }
             return 1
         }
@@ -557,9 +626,7 @@ function Start-FileDownload {
             } catch {}
         }
         
-        if (Test-Path $tempPath) {
-            Remove-Item $tempPath -Force -ErrorAction SilentlyContinue
-        }
+        # Keep temp file and control file for resume on failure
         if (Test-Path $ariaLog) {
             Remove-Item $ariaLog -Force -ErrorAction SilentlyContinue
         }
@@ -622,12 +689,10 @@ if ($info) {
     Write-Warn "Could not get share info, trying file list directly..."
 }
 
-# Get file list
+# Get file list (recursively expand directories)
 Write-Info "Getting file list..."
-$list = Get-FileList -shareId $shareId -domain $domain
-if (-not $list -or -not $list.files) { Write-Err "No files found or share expired"; exit 1 }
-
-$files = $list.files
+$files = Expand-FileList -shareId $shareId -domain $domain
+if (-not $files -or $files.Count -eq 0) { Write-Err "No files found or share expired"; exit 1 }
 
 # Select files
 if ($files.Count -eq 1) {
@@ -639,8 +704,8 @@ if ($files.Count -eq 1) {
     Write-Host ""
     for ($i = 0; $i -lt $files.Count; $i++) {
         $f = $files[$i]
-        $icon = if ($f.type -eq 1) { "[DIR]" } else { "[FILE]" }
-        Write-Host "  [$($i+1)] $icon $($f.name) ($(Format-Size -size $f.size))" -ForegroundColor White
+        $displayName = if ($f._relativePath) { "$($f._relativePath)/$($f.name)" } else { $f.name }
+        Write-Host "  [$($i+1)] [FILE] $displayName ($(Format-Size -size $f.size))" -ForegroundColor White
     }
     Write-Host ""
     Write-Host "Enter file numbers (comma-separated) or 'all':" -ForegroundColor Cyan
@@ -675,12 +740,25 @@ if (-not (Test-DiskSpace -requiredBytes $totalSize -path $OutputDir)) {
 $success = 0
 $failed = 0
 foreach ($file in $selected) {
-    $name = $file.name
+    $name = Sanitize-FileName -name $file.name
     $uri = $file.path
-    $out = Join-Path $OutputDir $name
+    $relativePath = $file._relativePath
+    
+    # Build target path, create subdirectories if needed
+    $targetDir = $OutputDir
+    if ($relativePath) {
+        $subDirs = $relativePath -split "/" | ForEach-Object { Sanitize-FileName -name $_ }
+        $sanitizedRelativePath = $subDirs -join "\"
+        $targetDir = Join-Path $OutputDir $sanitizedRelativePath
+        if (-not (Test-Path $targetDir)) {
+            New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+        }
+    }
+    $out = Join-Path $targetDir $name
+    $displayName = if ($relativePath) { "$relativePath/$($file.name)" } else { $file.name }
     
     Write-Host "----------------------------------------" -ForegroundColor Gray
-    Write-Info "File: $name"
+    Write-Info "File: $displayName"
     Write-Info "Size: $(Format-Size -size $file.size)"
     Write-Host ""
     
@@ -716,7 +794,7 @@ foreach ($file in $selected) {
         $code = Start-FileDownload -url $url -outPath $out -fileSize $file.size -conn $Aria2Connections -domain $domain
         
         if ($code -eq 0 -and (Test-Path $out) -and (Get-Item $out).Length -eq $file.size) {
-            Write-Success "Done: $name"
+            Write-Success "Done: $displayName"
             $success++
             $done = $true
         } else {
@@ -730,7 +808,7 @@ foreach ($file in $selected) {
     }
     
     if (-not $done) {
-        Write-Err "Failed after $maxRetry attempts: $name"
+        Write-Err "Failed after $maxRetry attempts: $displayName"
         $failed++
     }
     
