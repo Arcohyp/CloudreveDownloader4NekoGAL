@@ -367,6 +367,44 @@ function Test-Aria2Installed {
 function Install-Aria2 {
     Write-Warn (L "aria2_not_found")
     
+    # Method 1: Try winget first (most direct for Windows 10/11)
+    $winget = Get-Command winget -ErrorAction SilentlyContinue
+    if ($winget) {
+        Write-Info "winget found, trying to install aria2 via winget..."
+        try {
+            $proc = Start-Process -FilePath "winget" -ArgumentList "install","aria2.aria2","--silent","--accept-source-agreements","--accept-package-agreements" -Wait -PassThru -WindowStyle Hidden
+            if ($proc.ExitCode -eq 0) {
+                Write-Info "winget installation completed, searching for aria2..."
+                # Refresh PATH and search again
+                $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+                Start-Sleep -Seconds 2
+                if (Test-Aria2Installed) {
+                    return $true
+                }
+                # winget installed but not in PATH yet, check common winget location
+                $wingetPaths = @(
+                    "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\aria2.aria2_Microsoft.Winget.Source_8wekyb3d8bbwe"
+                    "$env:LOCALAPPDATA\Microsoft\WinGet\Links"
+                )
+                foreach ($p in $wingetPaths) {
+                    if (Test-Path $p) {
+                        $exe = Get-ChildItem -Path $p -Filter "aria2c.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                        if ($exe) {
+                            $script:Aria2Path = $exe.FullName
+                            Write-Success (L "aria2_ready")
+                            return $true
+                        }
+                    }
+                }
+            }
+        } catch {
+            Write-Warn "winget install failed: $_"
+        }
+    }
+    
+    # Method 2: Download portable version from GitHub
+    Write-Info "winget not available or failed, downloading portable aria2 from GitHub..."
+    
     $toolsDir = Join-Path $script:BaseDir "tools"
     $aria2Dir = Join-Path $toolsDir "aria2"
     
@@ -377,9 +415,7 @@ function Install-Aria2 {
     Write-Info (L "aria2_downloading")
     
     try {
-        # Get latest release info from GitHub
         $release = Invoke-RestMethod -Uri "https://api.github.com/repos/aria2/aria2/releases/latest" -TimeoutSec 30
-        $version = $release.tag_name -replace "release-", ""
         $asset = $release.assets | Where-Object { $_.name -like "*win-64bit*.zip" } | Select-Object -First 1
         
         if (-not $asset) {
@@ -389,24 +425,18 @@ function Install-Aria2 {
         
         $zipPath = Join-Path $toolsDir "aria2.zip"
         
-        # Download aria2
         $wc = New-Object System.Net.WebClient
         $wc.DownloadFile($asset.browser_download_url, $zipPath)
         
         Write-Info (L "aria2_extracting")
         
-        # Extract
         Expand-Archive -Path $zipPath -DestinationPath $toolsDir -Force
         
-        # Find extracted folder (usually aria2-x.x.x-win-64bit-build1)
         $extracted = Get-ChildItem -Path $toolsDir -Directory | Where-Object { $_.Name -like "aria2-*-win-64bit*" } | Select-Object -First 1
         
         if ($extracted) {
-            # Move aria2c.exe and necessary files to tools/aria2/
             if (Test-Path $aria2Dir) { Remove-Item $aria2Dir -Recurse -Force }
             New-Item -ItemType Directory -Path $aria2Dir -Force | Out-Null
-            
-            # Move all contents from extracted folder to aria2Dir
             Get-ChildItem -Path $extracted.FullName | Move-Item -Destination $aria2Dir -Force
             Remove-Item $extracted.FullName -Recurse -Force
         }
