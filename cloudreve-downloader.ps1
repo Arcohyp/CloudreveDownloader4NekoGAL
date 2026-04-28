@@ -97,10 +97,10 @@ class DownloaderLogger {
 }
 
 # ==================== Console Output ====================
-function Write-Info    { param([string]$msg) Write-Host "[INFO] $msg" -ForegroundColor Cyan; $script:Logger.Info($msg) }
-function Write-Success { param([string]$msg) Write-Host "[OK]   $msg" -ForegroundColor Green; $script:Logger.Success($msg) }
-function Write-Warn    { param([string]$msg) Write-Host "[WARN] $msg" -ForegroundColor Yellow; $script:Logger.Info("WARN: $msg") }
-function Write-Err     { param([string]$msg) Write-Host "[ERR]  $msg" -ForegroundColor Red; $script:Logger.Error($msg) }
+function Write-Info    { param([string]$msg) Write-Host "[INFO] $msg" -ForegroundColor Cyan; if ($script:Logger) { $script:Logger.Info($msg) } }
+function Write-Success { param([string]$msg) Write-Host "[OK]   $msg" -ForegroundColor Green; if ($script:Logger) { $script:Logger.Success($msg) } }
+function Write-Warn    { param([string]$msg) Write-Host "[WARN] $msg" -ForegroundColor Yellow; if ($script:Logger) { $script:Logger.Info("WARN: $msg") } }
+function Write-Err     { param([string]$msg) Write-Host "[ERR]  $msg" -ForegroundColor Red; if ($script:Logger) { $script:Logger.Error($msg) } }
 
 # ==================== Config ====================
 function Load-Config {
@@ -260,8 +260,8 @@ function Parse-ShareLink {
     if ($link -match 'https?://[^/]+/s/([a-zA-Z0-9]+)') {
         return @{ ShareId = $matches[1]; Domain = ($link -split '/s/')[0] }
     }
-    if ($link -match 'cloudreve%3A%2F%2F([a-zA-Z0-9]+)%40share') {
-        $shareId = $matches[1]
+    if ($link -match 'cloudreve%3A%2F%2F([a-zA-Z0-9%:]+)%40share') {
+        $shareId = [System.Uri]::UnescapeDataString($matches[1])
         $domain = "https://pan.nekogal.top"
         if ($link -match 'https?://[^/]+') { $domain = $matches[0] }
         return @{ ShareId = $shareId; Domain = $domain }
@@ -610,18 +610,20 @@ Write-Host ""
 # Get share info
 Write-Info "Getting share info..."
 $info = Get-ShareInfo -shareId $shareId -domain $domain
-if (-not $info) { Write-Err "Share not found or expired"; exit 1 }
-
-Write-Host "Name:      $($info.name)" -ForegroundColor White
-Write-Host "Owner:     $($info.owner.nickname)" -ForegroundColor White
-Write-Host "Views:     $($info.visited)" -ForegroundColor White
-Write-Host "Downloads: $($info.downloaded)" -ForegroundColor White
-Write-Host ""
+if ($info) {
+    Write-Host "Name:      $($info.name)" -ForegroundColor White
+    Write-Host "Owner:     $($info.owner.nickname)" -ForegroundColor White
+    Write-Host "Views:     $($info.visited)" -ForegroundColor White
+    Write-Host "Downloads: $($info.downloaded)" -ForegroundColor White
+    Write-Host ""
+} else {
+    Write-Warn "Could not get share info, trying file list directly..."
+}
 
 # Get file list
 Write-Info "Getting file list..."
 $list = Get-FileList -shareId $shareId -domain $domain
-if (-not $list -or -not $list.files) { Write-Err "No files found"; exit 1 }
+if (-not $list -or -not $list.files) { Write-Err "No files found or share expired"; exit 1 }
 
 $files = $list.files
 
