@@ -6,5 +6,6 @@
   "logEnabled": true,
   "checkDiskSpace": true,
   "minFreeSpaceGB": 2,
-  "proxy": ""
+  "proxy": "",
+  "language": "auto"
 }

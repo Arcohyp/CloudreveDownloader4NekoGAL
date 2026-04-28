@@ -38,7 +38,7 @@ param(
     [int]$Aria2Connections = 0
 )
 
-$script:Version = "3.1.2"
+$script:Version = "3.2.0"
 # Auto-detect script directory (works wherever the user places the folder)
 $script:BaseDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 if (-not $script:BaseDir) {
@@ -110,13 +110,13 @@ function Load-Config {
             # Fix hardcoded paths if user moved the folder
             $needsSave = $false
             if ($script:Config.defaultOutputDir -and $script:Config.defaultOutputDir -notlike "$($script:BaseDir)*") {
-                Write-Info "Detected folder move, updating config paths..."
+                Write-Info (L "detected_folder_move")
                 $script:Config.defaultOutputDir = Join-Path $script:BaseDir "downloads"
                 $needsSave = $true
             }
             if ($needsSave) { Save-Config }
         } catch {
-            Write-Warn "Config file corrupted, using defaults"
+            Write-Warn (L "config_corrupted")
             $script:Config = Get-DefaultConfig
         }
     } else {
@@ -129,12 +129,173 @@ function Load-Config {
     if (-not (Test-Path $script:TempDir)) {
         try {
             New-Item -ItemType Directory -Path $script:TempDir -Force | Out-Null
-            Write-Info "Created temp directory: $($script:TempDir)"
+            Write-Info (L "created_temp_dir")": $($script:TempDir)"
         } catch {
-            Write-Err "Failed to create temp directory: $($script:TempDir). Check permissions."
+            Write-Err (L "temp_dir_failed")": $($script:TempDir). Check permissions."
             exit 1
         }
     }
+}
+
+# ==================== Localization ====================
+$script:LangDict = @{
+    "zh-CN" = @{
+        "aria2_not_found"           = "aria2 未找到！正在尝试自动安装..."
+        "aria2_downloading"         = "正在下载 aria2..."
+        "aria2_extracting"          = "正在解压 aria2..."
+        "aria2_ready"               = "aria2 已就绪"
+        "aria2_install_failed"      = "aria2 自动安装失败，请手动安装：winget install aria2.aria2"
+        "detected_folder_move"      = "检测到文件夹移动，正在更新配置路径..."
+        "config_corrupted"          = "配置文件已损坏，使用默认配置"
+        "created_temp_dir"          = "已创建临时目录"
+        "temp_dir_failed"           = "创建临时目录失败"
+        "parsing_link"              = "正在解析分享链接..."
+        "share_info_loaded"         = "获取分享信息成功"
+        "share_info_failed"         = "无法获取分享信息，直接尝试获取文件列表..."
+        "no_files_found"            = "未找到文件或分享已过期"
+        "single_file_auto"          = "单文件分享，自动选中"
+        "select_files"              = "输入文件编号（逗号分隔）或 'all'："
+        "no_files_selected"         = "未选择文件"
+        "selected_count"            = "已选择 {0} 个文件"
+        "created_output"            = "已创建："
+        "disk_space_check"          = "磁盘空间检查"
+        "insufficient_space"        = "磁盘空间不足！"
+        "starting_download"         = "开始下载..."
+        "resuming_download"         = "正在恢复下载（{0:N2} MB 已下载）..."
+        "download_completed"        = "下载完成"
+        "size_mismatch"             = "下载大小不匹配"
+        "download_failed"           = "下载失败（退出码：{0}）"
+        "retrying"                  = "重试 {0}/{1} - 正在刷新下载链接..."
+        "cannot_get_url"            = "无法获取下载链接"
+        "waiting_retry"             = "等待 5 秒后重试..."
+        "failed_after_retries"      = "经过 {0} 次尝试后失败"
+        "already_exists"            = "文件已存在，跳过"
+        "exists_overwrite"          = "文件存在但大小不同，将覆盖"
+        "all_done"                  = "全部完成！"
+        "completed_summary"         = "完成：{0} 成功，{1} 失败"
+        "location"                  = "下载位置"
+        "log_location"              = "日志"
+        "cleanup"                   = "正在清理临时文件..."
+        "error_occurred"            = "发生错误"
+        "stack_trace"               = "堆栈跟踪"
+        "press_any_key"             = "按任意键退出..."
+        "invalid_link"              = "无效的分享链接格式"
+        "no_link"                   = "未提供链接"
+        "parse_link"                = "粘贴 Cloudreve 分享链接"
+        "example_standard"          = "示例：https://pan.xxx.com/s/xxxxx"
+        "example_pan_home"          = "      https://pan.nekogal.top/home?path=cloudreve%3A%2F%2Fxxxxx%40share"
+        "example_share_home"        = "      https://share.nekogal.top/home?path=cloudreve%3A%2F%2Fxxxxx%40share"
+        "share_id"                  = "分享 ID"
+        "domain"                    = "域名"
+        "file"                      = "文件"
+        "size"                      = "大小"
+        "total_progress"            = "总进度"
+        "current_file"              = "当前文件"
+        "eta"                       = "预计剩余时间"
+        "speed"                     = "速度"
+        "hints"                     = "操作提示"
+        "hints_select"              = "[Up/Down] 移动  [Space] 勾选  [A] 全选  [Enter] 开始下载  [Q] 退出"
+        "hints_download"            = "[P] 暂停  [R] 继续  [C] 取消当前  [Q] 退出"
+        "step_parse"                = "解析链接"
+        "step_info"                 = "获取信息"
+        "step_select"               = "选择文件"
+        "step_download"             = "下载文件"
+        "share_info"                = "分享信息"
+        "name"                      = "名称"
+        "owner"                     = "所有者"
+        "views"                     = "浏览"
+        "downloads"                 = "下载"
+        "file_list"                 = "文件列表"
+        "type"                      = "类型"
+        "dir_label"                 = "[目录]"
+        "file_label"                = "[文件]"
+    }
+    "en-US" = @{
+        "aria2_not_found"           = "aria2 not found! Attempting automatic installation..."
+        "aria2_downloading"         = "Downloading aria2..."
+        "aria2_extracting"          = "Extracting aria2..."
+        "aria2_ready"               = "aria2 ready"
+        "aria2_install_failed"      = "aria2 auto-install failed. Please install manually: winget install aria2.aria2"
+        "detected_folder_move"      = "Detected folder move, updating config paths..."
+        "config_corrupted"          = "Config file corrupted, using defaults"
+        "created_temp_dir"          = "Created temp directory"
+        "temp_dir_failed"           = "Failed to create temp directory"
+        "parsing_link"              = "Parsing share link..."
+        "share_info_loaded"         = "Share info loaded"
+        "share_info_failed"         = "Could not get share info, trying file list directly..."
+        "no_files_found"            = "No files found or share expired"
+        "single_file_auto"          = "Single file share, auto-selected"
+        "select_files"              = "Enter file numbers (comma-separated) or 'all':"
+        "no_files_selected"         = "No files selected"
+        "selected_count"            = "Selected {0} file(s)"
+        "created_output"            = "Created:"
+        "disk_space_check"          = "Disk space check"
+        "insufficient_space"        = "Insufficient disk space!"
+        "starting_download"         = "Starting download..."
+        "resuming_download"         = "Resuming download ({0:N2} MB already downloaded)..."
+        "download_completed"        = "Download completed"
+        "size_mismatch"             = "Download size mismatch"
+        "download_failed"           = "Download failed (exit code: {0})"
+        "retrying"                  = "Retry {0}/{1} - Getting fresh URL..."
+        "cannot_get_url"            = "Cannot get download URL"
+        "waiting_retry"             = "Waiting 5s before retry..."
+        "failed_after_retries"      = "Failed after {0} attempts"
+        "already_exists"            = "Already exists, skipped"
+        "exists_overwrite"          = "File exists but size differs, will overwrite"
+        "all_done"                  = "All done!"
+        "completed_summary"         = "Completed: {0} success, {1} failed"
+        "location"                  = "Location"
+        "log_location"              = "Log"
+        "cleanup"                   = "Cleaning up temporary files..."
+        "error_occurred"            = "An error occurred"
+        "stack_trace"               = "Stack trace"
+        "press_any_key"             = "Press any key to exit..."
+        "invalid_link"              = "Invalid share link format"
+        "no_link"                   = "No link provided"
+        "parse_link"                = "Paste Cloudreve share link"
+        "example_standard"          = "Example: https://pan.xxx.com/s/xxxxx"
+        "example_pan_home"          = "        https://pan.nekogal.top/home?path=cloudreve%3A%2F%2Fxxxxx%40share"
+        "example_share_home"        = "        https://share.nekogal.top/home?path=cloudreve%3A%2F%2Fxxxxx%40share"
+        "share_id"                  = "Share ID"
+        "domain"                    = "Domain"
+        "file"                      = "File"
+        "size"                      = "Size"
+        "total_progress"            = "Overall"
+        "current_file"              = "Current"
+        "eta"                       = "ETA"
+        "speed"                     = "Speed"
+        "hints"                     = "Hints"
+        "hints_select"              = "[Up/Down] Move  [Space] Select  [A] All  [Enter] Start  [Q] Quit"
+        "hints_download"            = "[P] Pause  [R] Resume  [C] Cancel  [Q] Quit"
+        "step_parse"                = "Parse"
+        "step_info"                 = "Info"
+        "step_select"               = "Select"
+        "step_download"             = "Download"
+        "share_info"                = "Share Info"
+        "name"                      = "Name"
+        "owner"                     = "Owner"
+        "views"                     = "Views"
+        "downloads"                 = "Downloads"
+        "file_list"                 = "File List"
+        "type"                      = "Type"
+        "dir_label"                 = "[DIR]"
+        "file_label"                = "[FILE]"
+    }
+}
+
+function L {
+    param([string]$key, [array]$args)
+    $lang = if ($script:Config -and $script:Config.language) { $script:Config.language } else { "auto" }
+    if ($lang -eq "auto") {
+        $uiLang = (Get-UICulture).Name
+        if ($uiLang -like "zh*") { $lang = "zh-CN" } else { $lang = "en-US" }
+    }
+    $dict = if ($script:LangDict.ContainsKey($lang)) { $script:LangDict[$lang] } else { $script:LangDict["zh-CN"] }
+    $text = if ($dict.ContainsKey($key)) { $dict[$key] } else { $key }
+    if ($args -and $args.Count -gt 0) {
+        return ($text -f $args)
+    }
+    return $text
 }
 
 function Get-DefaultConfig {
@@ -147,6 +308,7 @@ function Get-DefaultConfig {
         checkDiskSpace = $true
         minFreeSpaceGB = 2
         proxy = ""
+        language = "auto"
     }
 }
 
@@ -179,6 +341,14 @@ function Test-Aria2Installed {
         }
     }
     
+    # Check bundled aria2 in tools directory
+    if (-not $script:Aria2Path -or -not (Test-Path $script:Aria2Path)) {
+        $toolsAria2 = Join-Path $script:BaseDir "tools\aria2\aria2c.exe"
+        if (Test-Path $toolsAria2) {
+            $script:Aria2Path = $toolsAria2
+        }
+    }
+    
     if (-not $script:Aria2Path -or -not (Test-Path $script:Aria2Path)) {
         return $false
     }
@@ -189,9 +359,71 @@ function Test-Aria2Installed {
         Write-Info "aria2 version: $versionOutput"
         return $true
     } catch {
-        Write-Warn "aria2 found but cannot execute: $_"
+        Write-Warn (L "aria2_install_failed")
         return $false
     }
+}
+
+function Install-Aria2 {
+    Write-Warn (L "aria2_not_found")
+    
+    $toolsDir = Join-Path $script:BaseDir "tools"
+    $aria2Dir = Join-Path $toolsDir "aria2"
+    
+    if (-not (Test-Path $toolsDir)) {
+        New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null
+    }
+    
+    Write-Info (L "aria2_downloading")
+    
+    try {
+        # Get latest release info from GitHub
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/aria2/aria2/releases/latest" -TimeoutSec 30
+        $version = $release.tag_name -replace "release-", ""
+        $asset = $release.assets | Where-Object { $_.name -like "*win-64bit*.zip" } | Select-Object -First 1
+        
+        if (-not $asset) {
+            Write-Warn "Could not find aria2 Windows release"
+            return $false
+        }
+        
+        $zipPath = Join-Path $toolsDir "aria2.zip"
+        
+        # Download aria2
+        $wc = New-Object System.Net.WebClient
+        $wc.DownloadFile($asset.browser_download_url, $zipPath)
+        
+        Write-Info (L "aria2_extracting")
+        
+        # Extract
+        Expand-Archive -Path $zipPath -DestinationPath $toolsDir -Force
+        
+        # Find extracted folder (usually aria2-x.x.x-win-64bit-build1)
+        $extracted = Get-ChildItem -Path $toolsDir -Directory | Where-Object { $_.Name -like "aria2-*-win-64bit*" } | Select-Object -First 1
+        
+        if ($extracted) {
+            # Move aria2c.exe and necessary files to tools/aria2/
+            if (Test-Path $aria2Dir) { Remove-Item $aria2Dir -Recurse -Force }
+            New-Item -ItemType Directory -Path $aria2Dir -Force | Out-Null
+            
+            # Move all contents from extracted folder to aria2Dir
+            Get-ChildItem -Path $extracted.FullName | Move-Item -Destination $aria2Dir -Force
+            Remove-Item $extracted.FullName -Recurse -Force
+        }
+        
+        Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+        
+        $script:Aria2Path = Join-Path $aria2Dir "aria2c.exe"
+        
+        if (Test-Path $script:Aria2Path) {
+            Write-Success (L "aria2_ready")
+            return $true
+        }
+    } catch {
+        Write-Warn "Failed to auto-install aria2: $_"
+    }
+    
+    return $false
 }
 
 # ==================== Signal Handler ====================
@@ -221,7 +453,7 @@ function Check-Interrupt {
 }
 
 function Cleanup-TempFiles {
-    Write-Info "Cleaning up temporary files..."
+    Write-Info (L "cleanup")
     $temps = Get-ChildItem -Path $script:TempDir -Filter "*.tmp" -ErrorAction SilentlyContinue
     foreach ($t in $temps) {
         try {
@@ -242,10 +474,10 @@ function Test-DiskSpace {
     $requiredGB = [math]::Round($requiredBytes / 1GB, 2)
     $minGB = $script:Config.minFreeSpaceGB
     
-    Write-Info "Disk space check: $freeGB GB free, $requiredGB GB required, $minGB GB minimum"
+    Write-Info "$(L "disk_space_check"): $freeGB GB free, $requiredGB GB required, $minGB GB minimum"
     
     if ($freeGB -lt ($requiredGB + $minGB)) {
-        Write-Err "Insufficient disk space!"
+        Write-Err (L "insufficient_space")
         Write-Err "Free: $freeGB GB | Required: $requiredGB GB | Min reserve: $minGB GB"
         return $false
     }
@@ -456,7 +688,7 @@ function Start-FileDownload {
     $resume = $false
     if (Test-Path $aria2CtrlFile) {
         $ctrlSize = if (Test-Path $tempPath) { (Get-Item $tempPath).Length } else { 0 }
-        Write-Info "Resuming download ($([math]::Round($ctrlSize/1MB,2)) MB already downloaded)..."
+        Write-Info (L "resuming_download" -f ($ctrlSize/1MB))
         $resume = $true
     }
     
@@ -503,7 +735,7 @@ function Start-FileDownload {
         $ariaArgs += "--all-proxy=$($script:Config.proxy)"
     }
     
-    Write-Info "Starting download..."
+    Write-Info (L "starting_download")
     $script:Logger.Info("Download started: $url -> $outPath")
     
     # Start aria2 process with captured output for diagnostics
@@ -599,7 +831,7 @@ function Start-FileDownload {
             if (Test-Path $ariaLog) { Remove-Item $ariaLog -Force -ErrorAction SilentlyContinue }
             return 0
         } else {
-            Write-Warn "Download size mismatch: expected $fileSize, got $actualSize"
+            Write-Warn (L "size_mismatch")": expected $fileSize, got $actualSize"
             # Keep temp file for potential resume if size is reasonable
             if ($actualSize -lt 1MB) {
                 if (Test-Path $tempPath) { Remove-Item $tempPath -Force -ErrorAction SilentlyContinue }
@@ -609,7 +841,7 @@ function Start-FileDownload {
             return 1
         }
     } else {
-        Write-Err "Download failed (exit code: $($process.ExitCode))"
+        Write-Err (L "download_failed" -f $process.ExitCode)
         if ($errorDetails) {
             Write-Err "Details:"
             Write-Host $errorDetails -ForegroundColor DarkGray
@@ -648,10 +880,12 @@ Register-ExitHandler
 
 # Check aria2
 if (-not (Test-Aria2Installed)) {
-    Write-Err "aria2 not found! Install with: winget install aria2.aria2"
-    exit 1
+    if (-not (Install-Aria2)) {
+        Write-Err (L "aria2_install_failed")
+        exit 1
+    }
 }
-Write-Success "aria2 ready"
+Write-Success (L "aria2_ready")
 
 # Apply config defaults
 if (-not $OutputDir) { $OutputDir = $script:Config.defaultOutputDir }
@@ -659,57 +893,57 @@ if ($Aria2Connections -eq 0) { $Aria2Connections = $script:Config.defaultConnect
 
 # Get share link
 if (-not $ShareLink) {
-    Write-Host "Paste Cloudreve share link:" -ForegroundColor Cyan
-    Write-Host "  Example: https://pan.xxx.com/s/xxxxx" -ForegroundColor Gray
-    Write-Host "          https://pan.nekogal.top/home?path=cloudreve%3A%2F%2Fxxxxx%40share" -ForegroundColor Gray
-    Write-Host "          https://share.nekogal.top/home?path=cloudreve%3A%2F%2Fxxxxx%40share" -ForegroundColor Gray
+    Write-Host (L "parse_link") -ForegroundColor Cyan
+    Write-Host "  $(L "example_standard")" -ForegroundColor Gray
+    Write-Host "  $(L "example_pan_home")" -ForegroundColor Gray
+    Write-Host "  $(L "example_share_home")" -ForegroundColor Gray
     $ShareLink = Read-Host "Link"
 }
-if (-not $ShareLink) { Write-Err "No link provided"; exit 1 }
+if (-not $ShareLink) { Write-Err (L "no_link"); exit 1 }
 
 # Parse link
 $parsed = Parse-ShareLink -link $ShareLink
-if (-not $parsed) { Write-Err "Invalid share link format"; exit 1 }
+if (-not $parsed) { Write-Err (L "invalid_link"); exit 1 }
 $shareId = $parsed.ShareId
 $domain = $parsed.Domain
-Write-Info "Share ID: $shareId"
-Write-Info "Domain: $domain"
+Write-Info "$(L "share_id"): $shareId"
+Write-Info "$(L "domain"): $domain"
 Write-Host ""
 
 # Get share info
-Write-Info "Getting share info..."
+Write-Info (L "parsing_link")
 $info = Get-ShareInfo -shareId $shareId -domain $domain
 if ($info) {
-    Write-Host "Name:      $($info.name)" -ForegroundColor White
-    Write-Host "Owner:     $($info.owner.nickname)" -ForegroundColor White
-    Write-Host "Views:     $($info.visited)" -ForegroundColor White
-    Write-Host "Downloads: $($info.downloaded)" -ForegroundColor White
+    Write-Host "$(L "name"):      $($info.name)" -ForegroundColor White
+    Write-Host "$(L "owner"):     $($info.owner.nickname)" -ForegroundColor White
+    Write-Host "$(L "views"):     $($info.visited)" -ForegroundColor White
+    Write-Host "$(L "downloads"): $($info.downloaded)" -ForegroundColor White
     Write-Host ""
 } else {
-    Write-Warn "Could not get share info, trying file list directly..."
+    Write-Warn (L "share_info_failed")
 }
 
 # Get file list (recursively expand directories)
-Write-Info "Getting file list..."
+Write-Info (L "parsing_link")
 $files = Expand-FileList -shareId $shareId -domain $domain
-if (-not $files -or $files.Count -eq 0) { Write-Err "No files found or share expired"; exit 1 }
+if (-not $files -or $files.Count -eq 0) { Write-Err (L "no_files_found"); exit 1 }
 
 # Select files
 if ($files.Count -eq 1) {
     $selected = @($files[0])
-    Write-Success "Single file share, auto-selected"
+    Write-Success (L "single_file_auto")
 } else {
     Write-Host ""
-    Write-Host "Share contains $($files.Count) file(s):" -ForegroundColor Cyan
+    Write-Host "$(L "file_list") ($($files.Count))" -ForegroundColor Cyan
     Write-Host ""
     for ($i = 0; $i -lt $files.Count; $i++) {
         $f = $files[$i]
         $displayName = if ($f._relativePath) { "$($f._relativePath)/$($f.name)" } else { $f.name }
-        Write-Host "  [$($i+1)] [FILE] $displayName ($(Format-Size -size $f.size))" -ForegroundColor White
+        Write-Host "  [$($i+1)] [$(L "file_label")] $displayName ($(Format-Size -size $f.size))" -ForegroundColor White
     }
     Write-Host ""
-    Write-Host "Enter file numbers (comma-separated) or 'all':" -ForegroundColor Cyan
-    $sel = Read-Host "Select"
+    Write-Host (L "select_files") -ForegroundColor Cyan
+    $sel = Read-Host (L "select_files")
     if ($sel -eq "all") { $selected = $files }
     else {
         $idx = $sel -split "," | ForEach-Object { $_.Trim() -as [int] } | Where-Object { $_ -gt 0 -and $_ -le $files.Count }
@@ -717,16 +951,16 @@ if ($files.Count -eq 1) {
     }
 }
 
-if (-not $selected -or $selected.Count -eq 0) { Write-Err "No files selected"; exit 1 }
+if (-not $selected -or $selected.Count -eq 0) { Write-Err (L "no_files_selected"); exit 1 }
 
 Write-Host ""
-Write-Success "Selected $($selected.Count) file(s)"
+Write-Success (L "selected_count" -f $selected.Count)
 Write-Host ""
 
 # Create output dir
 if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
-    Write-Info "Created: $OutputDir"
+    Write-Info "$(L "created_output") $OutputDir"
 }
 
 # Calculate total size for disk check
@@ -758,18 +992,18 @@ foreach ($file in $selected) {
     $displayName = if ($relativePath) { "$relativePath/$($file.name)" } else { $file.name }
     
     Write-Host "----------------------------------------" -ForegroundColor Gray
-    Write-Info "File: $displayName"
-    Write-Info "Size: $(Format-Size -size $file.size)"
+    Write-Info "$(L "file"): $displayName"
+    Write-Info "$(L "size"): $(Format-Size -size $file.size)"
     Write-Host ""
     
     if (Test-Path $out) {
         $es = (Get-Item $out).Length
         if ($es -eq $file.size) {
-            Write-Success "Already exists, skipped"
+            Write-Success (L "already_exists")
             $success++
             continue
         }
-        Write-Warn "File exists but size differs, will overwrite"
+        Write-Warn (L "exists_overwrite")
         Remove-Item $out -Force
     }
     
@@ -780,12 +1014,12 @@ foreach ($file in $selected) {
     
     while ($retry -lt $maxRetry -and -not $done) {
         if ($retry -gt 0) {
-            Write-Info "Retry $($retry)/$maxRetry - Getting fresh URL..."
+            Write-Info (L "retrying" -f $retry, $maxRetry)
         }
         
         $url = Get-DownloadUrl -fileUri $uri -domain $domain
         if (-not $url) {
-            Write-Err "Cannot get download URL"
+            Write-Err (L "cannot_get_url")
             $retry++
             if ($retry -lt $maxRetry) { Start-Sleep -Seconds 3 }
             continue
@@ -794,21 +1028,21 @@ foreach ($file in $selected) {
         $code = Start-FileDownload -url $url -outPath $out -fileSize $file.size -conn $Aria2Connections -domain $domain
         
         if ($code -eq 0 -and (Test-Path $out) -and (Get-Item $out).Length -eq $file.size) {
-            Write-Success "Done: $displayName"
+            Write-Success (L "download_completed")": $displayName"
             $success++
             $done = $true
         } else {
-            Write-Warn "Download failed (attempt $($retry + 1))"
+            Write-Warn (L "download_failed" -f ($retry + 1))
             $retry++
             if ($retry -lt $maxRetry) {
-                Write-Info "Waiting 5s before retry..."
+                Write-Info (L "waiting_retry")
                 Start-Sleep -Seconds 5
             }
         }
     }
     
     if (-not $done) {
-        Write-Err "Failed after $maxRetry attempts: $displayName"
+        Write-Err (L "failed_after_retries" -f $maxRetry)
         $failed++
     }
     
@@ -818,13 +1052,13 @@ foreach ($file in $selected) {
 # Summary
 Write-Host "========================================" -ForegroundColor Magenta
 if ($success -eq $selected.Count) {
-    Write-Success "All done! ($success/$($selected.Count))"
+    Write-Success (L "all_done")" ($success/$($selected.Count))"
 } else {
-    Write-Warn "Completed: $success success, $failed failed"
+    Write-Warn (L "completed_summary" -f $success, $failed)
 }
-Write-Info "Location: $(Resolve-Path $OutputDir)"
+Write-Info "$(L "location"): $(Resolve-Path $OutputDir)"
 if ($script:Config.logEnabled) {
-    Write-Info "Log: $($script:Logger.LogFile)"
+    Write-Info "$(L "log_location"): $($script:Logger.LogFile)"
 }
 Write-Host "========================================" -ForegroundColor Magenta
 Write-Host ""
@@ -834,14 +1068,14 @@ Cleanup-TempFiles
 
 } catch {
     Write-Host ""
-    Write-Err "An error occurred: $_"
+    Write-Err (L "error_occurred")": $_"
     Write-Host ""
-    Write-Host "Stack trace:" -ForegroundColor DarkGray
+    Write-Host (L "stack_trace") -ForegroundColor DarkGray
     Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
     Write-Host ""
 } finally {
     # Keep window open when double-clicked
     Write-Host ""
-    Write-Host "Press any key to exit..." -ForegroundColor Gray
+    Write-Host (L "press_any_key") -ForegroundColor Gray
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }

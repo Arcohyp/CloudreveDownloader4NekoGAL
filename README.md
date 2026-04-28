@@ -1,4 +1,4 @@
-# Cloudreve Downloader v3.1
+# Cloudreve Downloader v3.2
 
 **专为 NekoGAL 优化的 Cloudreve 分享链接一键下载工具**
 
@@ -11,11 +11,13 @@
 ## ✨ 功能特点
 
 - 🚀 **多线程加速** - 自动调用 aria2 多线程下载，充分利用带宽
-- 📋 **智能解析** - 粘贴分享链接即可，自动识别文件列表
+- 📦 **自动安装 aria2** - 首次运行时自动下载 aria2，无需手动安装
+- 🌍 **多语言支持** - 默认中文，自动适配系统语言，支持手动切换中英文
+- 📋 **智能解析** - 粘贴分享链接即可，自动识别文件列表，支持递归展开子目录
 - 📊 **实时进度** - 显示下载进度、速度、已下载大小
 - 🛡️ **安全退出** - Ctrl+C 自动清理临时文件，不残留垃圾
 - 💾 **磁盘检查** - 自动检测剩余空间，避免下载失败
-- 🔄 **断点续传** - 支持自动重试和继续下载
+- 🔄 **断点续传** - 下载中断后自动检测并恢复，无需从头开始
 - 📝 **日志记录** - 自动记录下载日志，方便排查问题
 - 📁 **绿色便携** - 无需安装，放在任意位置即可使用
 
@@ -33,19 +35,24 @@
 
 > **注意：** 可以放在**任何位置**，脚本会自动检测所在目录。
 
-### 2. 安装 aria2
+### 2. 运行脚本
 
-**方式一：winget（推荐，Windows 10/11）**
+**方式一：双击运行（推荐）**
+
+双击 `双击运行.cmd` 文件即可启动。
+
+**方式二：命令行运行**
+
 ```powershell
-winget install aria2.aria2
+cd C:\CloudreveDownloader
+.\cloudreve-downloader.ps1
 ```
 
-**方式二：手动安装**
-1. 访问 https://github.com/aria2/aria2/releases
-2. 下载 `aria2-x.x.x-win-64bit-build1.zip`
-3. 解压到任意目录，将 `aria2c.exe` 所在目录添加到系统 PATH
-
-> 安装后**重启 PowerShell** 或**重启电脑**确保环境变量生效。
+> **aria2 会自动下载**> 
+> 首次运行时，脚本会自动从 GitHub 下载 aria2 便携版到 `tools/aria2/` 目录，无需手动安装。如果自动下载失败，你也可以手动安装：
+> ```powershell
+> winget install aria2.aria2
+> ```
 
 ---
 
@@ -120,9 +127,11 @@ https://pan.xxx.com/s/xxxxx/password
 
 - ✅ **Cloudflare R2 存储兼容** - 自动处理 R2 的签名 URL 和浏览器级请求头，避免 403 拦截
 - ✅ **大文件下载** - 针对数 GB 的 Galgame 资源优化，支持断点续传和自动重试
-- ✅ **中日文文件名** - 强制 UTF-8 编码，正确处理 `天使☆騒々_RE_BOOT！` 等文件名
+- ✅ **中日文文件名** - 强制 UTF-8 编码，正确处理 `天使☆騒々_RE_BOOT！` 等文件名，自动替换 Windows 非法字符
 - ✅ **跨机器兼容** - 修复了不同 Windows 环境（PowerShell 版本、TLS、区域设置）的兼容性问题
 - ✅ **一键下载** - 支持粘贴 NekoGAL 分享链接，自动解析文件列表
+- ✅ **递归目录下载** - 自动展开子文件夹，保留原始目录结构
+- ✅ **智能恢复** - 下载中断后自动检测并恢复，大文件无需从头下载
 
 **NekoGAL 分享链接示例：**
 ```
@@ -213,7 +222,8 @@ Select: 1,2,5
   "logEnabled": true,
   "checkDiskSpace": true,
   "minFreeSpaceGB": 2,
-  "proxy": ""
+  "proxy": "",
+  "language": "auto"
 }
 ```
 
@@ -227,6 +237,19 @@ Select: 1,2,5
 | `checkDiskSpace` | 检查磁盘空间 | `true` |
 | `minFreeSpaceGB` | 最小保留空间(GB) | `2` |
 | `proxy` | HTTP代理地址 | `""` |
+| `language` | 界面语言：`auto`/`zh-CN`/`en-US` | `"auto"` |
+
+### 切换语言
+
+```json
+{
+  "language": "en-US"
+}
+```
+
+- `auto`：自动检测系统语言（中文系统显示中文，英文系统显示英文）
+- `zh-CN`：强制中文
+- `en-US`：强制英文
 
 ### 使用代理
 
@@ -249,7 +272,10 @@ CloudreveDownloader/          # 主目录（可放在任意位置）
 ├── downloads/                # 默认下载目录
 ├── logs/                     # 日志文件（每天一个）
 │   └── download-2026-04-26.log
-└── temp/                     # 临时文件（自动清理）
+├── temp/                     # 临时文件（自动清理）
+└── tools/                    # 工具目录
+    └── aria2/                # 自动下载的 aria2（无需手动安装）
+        └── aria2c.exe
 ```
 
 ---
@@ -258,15 +284,16 @@ CloudreveDownloader/          # 主目录（可放在任意位置）
 
 ### Q: 双击 `双击运行.cmd` 后窗口一闪而过？
 **A:** 
-1. 检查是否安装了 aria2：`winget install aria2.aria2`
-2. 安装后**重启电脑**
-3. 确保没有将工具放在包含中文或特殊字符的路径中
+1. 检查网络连接（首次运行需要下载 aria2）
+2. 确保没有将工具放在包含中文或特殊字符的路径中
+3. 查看 `logs/` 目录下的日志文件排查错误
 
 ### Q: 提示 "aria2 not found"？
 **A:** 
-1. 运行 `winget install aria2.aria2` 安装 aria2
-2. **重启 PowerShell 或电脑**
-3. 确保 aria2 安装路径已添加到系统 PATH
+- **v3.2+ 版本**：脚本会自动下载 aria2，无需手动安装。如果自动下载失败：
+  1. 检查网络是否能访问 GitHub
+  2. 手动安装：`winget install aria2.aria2`
+  3. 重启 PowerShell
 
 ### Q: 下载速度很慢？
 **A:** 
@@ -364,6 +391,16 @@ Get-Help .\cloudreve-downloader.ps1 -Full
 ---
 
 ## 📝 更新日志
+
+### v3.2 (2026-04-28)
+- ✨ **自动安装 aria2** - 首次运行时自动从 GitHub 下载 aria2，无需用户手动安装
+- ✨ **多语言支持** - 默认中文，自动适配系统语言，config.json 可切换 `zh-CN`/`en-US`
+- ✨ **递归目录下载** - 自动展开子文件夹，保留原始目录结构
+- ✨ **断点续传** - 下载中断后自动检测 `.aria2` 控制文件并恢复下载
+- ✨ **文件名安全处理** - 自动替换 Windows 非法字符（`\ / : * ? " < > |`），处理保留名（CON、PRN 等）
+- 🔧 修复单文件分享列表显示异常问题
+- 🔧 修复 `home?path=` 链接中 Share ID 含编码字符时的解析失败
+- 🔧 修复切换位置后 Logger 未初始化导致的崩溃
 
 ### v3.1 (2026-04-26)
 - ✨ **NekoGAL 深度优化** - 针对 Cloudflare R2 存储后端进行专门适配
