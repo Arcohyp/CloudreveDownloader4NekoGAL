@@ -2,7 +2,7 @@
 
 **专为 NekoGAL 优化的 Cloudreve 分享链接一键下载工具**
 
-自动解析 Cloudreve v4 网盘分享链接，使用 aria2 多线程加速下载。支持单文件和文件夹分享。
+自动解析 Cloudreve v4 网盘分享链接，使用 aria2 多线程加速下载。支持单文件、文件夹及递归子目录下载。
 
 > 💡 **本工具针对 [NekoGAL](https://www.nekogal.com/) 深度优化**，完美支持其 Cloudflare R2 存储后端、大文件下载及中文/日文文件名处理。
 
@@ -10,94 +10,40 @@
 
 ## ✨ 功能特点
 
-- 🚀 **多线程加速** - 自动调用 aria2 多线程下载，充分利用带宽
-- 📦 **自动安装 aria2** - 首次运行时自动下载 aria2，无需手动安装
-- 🌍 **多语言支持** - 默认中文，自动适配系统语言，支持手动切换中英文
-- 📋 **智能解析** - 粘贴分享链接即可，自动识别文件列表，支持递归展开子目录
-- 📊 **实时进度** - 显示下载进度、速度、已下载大小
-- 🛡️ **安全退出** - Ctrl+C 自动清理临时文件，不残留垃圾
+- 🚀 **多线程加速** - aria2 多线程下载，充分利用带宽
+- 📦 **自动安装 aria2** - 首次运行自动下载，无需手动安装
+- 🌍 **多语言支持** - 默认中文，config.json 可切换 `zh-CN`/`en-US`
+- 📋 **智能解析** - 粘贴链接即可，自动递归展开子目录
+- 🔄 **断点续传** - 中断后自动恢复，大文件无需从头下载
+- 🛡️ **安全处理** - 自动替换 Windows 非法字符，UTF-8 编码
 - 💾 **磁盘检查** - 自动检测剩余空间，避免下载失败
-- 🔄 **断点续传** - 下载中断后自动检测并恢复，无需从头开始
 - 📝 **日志记录** - 自动记录下载日志，方便排查问题
 - 📁 **绿色便携** - 无需安装，放在任意位置即可使用
 
 ---
 
-## 📦 下载和准备
+## 📦 快速开始
 
 ### 1. 获取工具
 
-将 `CloudreveDownloader` 文件夹解压/复制到任意位置，例如：
-- `C:\CloudreveDownloader`
-- `D:\Tools\CloudreveDownloader`
-- 桌面
-- U 盘
+将 `CloudreveDownloader` 文件夹解压/复制到任意位置（桌面、U 盘均可）。
 
 > **注意：** 可以放在**任何位置**，脚本会自动检测所在目录。
 
-### 2. 运行脚本
+### 2. 运行
 
 **方式一：双击运行（推荐）**
 
-双击 `双击运行.cmd` 文件即可启动。
+双击 `双击运行.cmd` 即可启动。
 
-**方式二：命令行运行**
+**方式二：命令行**
 
 ```powershell
 cd C:\CloudreveDownloader
 .\cloudreve-downloader.ps1
 ```
 
-> **aria2 会自动下载**> 
-> 首次运行时，脚本会自动从 GitHub 下载 aria2 便携版到 `tools/aria2/` 目录，无需手动安装。如果自动下载失败，你也可以手动安装：
-> ```powershell
-> winget install aria2.aria2
-> ```
-
----
-
-## 🚀 使用方法
-
-### 下载 NekoGAL 资源（推荐）
-
-1. 在 NekoGAL 网站找到想下载的资源，复制分享链接
-2. 双击运行本工具，粘贴链接
-3. 工具自动解析文件列表，开始多线程下载
-
-### 方式一：双击运行（推荐）
-
-双击 `双击运行.cmd` 文件：
-
-```
-CloudreveDownloader/
-├── 双击运行.cmd              ← 双击这个！
-├── cloudreve-downloader.ps1
-├── config.json
-└── ...
-```
-
-按提示粘贴分享链接即可。
-
-### 方式二：命令行运行
-
-```powershell
-# 进入工具目录
-cd C:\CloudreveDownloader
-
-# 交互模式（提示输入链接）
-.\cloudreve-downloader.ps1
-
-# 直接传入 NekoGAL 链接
-.\cloudreve-downloader.ps1 -ShareLink "https://pan.nekogal.top/s/xxxxx"
-
-# 指定下载目录
-.\cloudreve-downloader.ps1 -ShareLink "https://pan.nekogal.top/s/xxxxx" -OutputDir "D:\Downloads"
-
-# 使用 32 线程加速（推荐用于 NekoGAL 大文件）
-.\cloudreve-downloader.ps1 -ShareLink "https://pan.nekogal.top/s/xxxxx" -Aria2Connections 32
-```
-
-> **不要直接双击 `.ps1` 文件**，Windows 默认会用记事本打开。
+> **aria2 会自动下载** - 首次运行时脚本会自动从 GitHub 下载 aria2 到 `tools/aria2/` 目录。如果自动下载失败，可手动安装：`winget install aria2.aria2`
 
 ---
 
@@ -105,113 +51,64 @@ cd C:\CloudreveDownloader
 
 ### 支持的分享链接格式
 
-**NekoGAL 专用格式：**
+**NekoGAL 专用：**
 ```
 https://pan.nekogal.top/s/xxxxx
-https://pan.nekogal.top/s/xxxxx/password
 https://pan.nekogal.top/home?path=cloudreve%3A%2F%2Fxxxxx%40share
 https://share.nekogal.top/home?path=cloudreve%3A%2F%2Fxxxxx%40share
 ```
 
-**通用 Cloudreve v4 格式：**
+**通用 Cloudreve v4：**
 ```
 https://pan.xxx.com/s/xxxxx
-https://pan.xxx.com/s/xxxxx/password
 ```
-
-> **支持任意 Cloudreve v4 站点**，但针对 NekoGAL 的 R2 存储后端进行了专门优化。
 
 ### NekoGAL 专属支持
 
-本工具对 **[NekoGAL](https://www.nekogal.com/)** 进行了深度适配与优化：
+- ✅ **Cloudflare R2 兼容** - 浏览器级请求头，避免 403 拦截
+- ✅ **大文件优化** - 数 GB 资源断点续传，自动重试
+- ✅ **中日文文件名** - UTF-8 编码，自动处理非法字符
+- ✅ **递归目录下载** - 自动展开子文件夹，保留目录结构
+- ✅ **智能恢复** - 检测 `.aria2` 控制文件，中断后自动续传
 
-- ✅ **Cloudflare R2 存储兼容** - 自动处理 R2 的签名 URL 和浏览器级请求头，避免 403 拦截
-- ✅ **大文件下载** - 针对数 GB 的 Galgame 资源优化，支持断点续传和自动重试
-- ✅ **中日文文件名** - 强制 UTF-8 编码，正确处理 `天使☆騒々_RE_BOOT！` 等文件名，自动替换 Windows 非法字符
-- ✅ **跨机器兼容** - 修复了不同 Windows 环境（PowerShell 版本、TLS、区域设置）的兼容性问题
-- ✅ **一键下载** - 支持粘贴 NekoGAL 分享链接，自动解析文件列表
-- ✅ **递归目录下载** - 自动展开子文件夹，保留原始目录结构
-- ✅ **智能恢复** - 下载中断后自动检测并恢复，大文件无需从头下载
+### 使用示例
 
-**NekoGAL 分享链接示例：**
-```
-https://pan.nekogal.top/s/xxxxx
-https://pan.nekogal.top/s/xxxxx/password
-```
-
-> **也支持其他 Cloudreve v4 站点**，但 NekoGAL 的兼容性经过专门测试和优化。
-
-### 单文件分享
-
-1. 粘贴分享链接
-2. 脚本自动识别为单文件
-3. 检查磁盘空间后自动开始下载
-4. 显示实时进度条
+**单文件分享** - 粘贴链接后自动识别，检查磁盘空间后直接下载：
 
 ```
 ========================================
-  Cloudreve Downloader v3.0.0
+  Cloudreve Downloader v3.2.0
 ========================================
 
-[OK]   aria2 ready
-Paste Cloudreve share link:
-  Example: https://pan.xxx.com/s/xxxxx
+[OK]   aria2 已就绪
+粘贴 Cloudreve 分享链接:
+  示例：https://pan.xxx.com/s/xxxxx
 Link: https://pan.nekogal.top/s/yE4u7
 
-[INFO] Share ID: yE4u7
-[INFO] Domain: https://pan.nekogal.top
+[INFO] 分享 ID: yE4u7
+[INFO] 获取分享信息...
+名称:      Mama×Holic.rar
+所有者:     skdy
 
-[INFO] Getting share info...
-Name:      Mama×Holic.rar
-Owner:     skdy
-Views:     8660
-Downloads: 6350
+[INFO] 获取文件列表...
+[OK]   单文件分享，自动选中
 
-[INFO] Getting file list...
-[OK]   Single file share, auto-selected
-
-[INFO] Disk space check: 219.97 GB free, 1.85 GB required, 2 GB minimum
+[INFO] 磁盘空间检查: 219.97 GB free, 1.85 GB required
 ----------------------------------------
-[INFO] File: Mama×Holic.rar
-[INFO] Size: 1.85 GB
+[INFO] 文件: Mama×Holic.rar
+[INFO] 大小: 1.85 GB
 
-[INFO] Starting download...
-[============================------------] 62% | 1.15 GB / 1.85 GB | 8.3 MB/s | MamaHolic.rar
+[INFO] 开始下载...
+[============================------------] 62% | 1.15 GB / 1.85 GB | 8.3 MB/s
 ```
 
-### 文件夹分享
-
-1. 粘贴分享链接
-2. 脚本列出所有文件
-3. 输入要下载的文件编号
-4. 支持输入 `all` 下载全部
-
-```
-Share contains 5 file(s):
-
-  [1] [FILE] video1.mp4 (500 MB)
-  [2] [FILE] video2.mp4 (600 MB)
-  [3] [FILE] readme.txt (2 KB)
-  [4] [DIR]  子文件夹/
-  [5] [FILE] image.jpg (5 MB)
-
-Enter file numbers (comma-separated) or 'all':
-Select: 1,2,5
-```
-
-### 下载中操作
-
-| 操作 | 说明 |
-|------|------|
-| **等待完成** | 正常等待，显示实时进度 |
-| **Ctrl+C 取消** | 安全退出，自动清理临时文件 |
-| **断点续传** | 重新运行脚本会自动跳过已完成的文件 |
+**文件夹分享** - 列出所有文件，输入 `all` 或编号如 `1,3,5` 选择性下载。
 
 ---
 
 ## ⚙️ 配置文件
 
-编辑 `config.json` 可自定义设置：
+编辑 `config.json`：
 
 ```json
 {
@@ -229,34 +126,21 @@ Select: 1,2,5
 
 | 配置项 | 说明 | 默认值 |
 |--------|------|--------|
-| `defaultOutputDir` | 默认下载目录 | `downloads` 子文件夹 |
-| `defaultConnections` | 默认 aria2 线程数 | `16` |
+| `defaultOutputDir` | 默认下载目录 | `downloads` |
+| `defaultConnections` | aria2 线程数 | `16` |
 | `autoRetry` | 失败自动重试 | `true` |
 | `maxRetries` | 最大重试次数 | `3` |
-| `logEnabled` | 启用日志记录 | `true` |
-| `checkDiskSpace` | 检查磁盘空间 | `true` |
-| `minFreeSpaceGB` | 最小保留空间(GB) | `2` |
-| `proxy` | HTTP代理地址 | `""` |
-| `language` | 界面语言：`auto`/`zh-CN`/`en-US` | `"auto"` |
+| `proxy` | HTTP 代理 | `""` |
+| `language` | 语言：`auto`/`zh-CN`/`en-US` | `"auto"` |
 
-### 切换语言
-
+**切换语言：**
 ```json
-{
-  "language": "en-US"
-}
+{ "language": "en-US" }
 ```
 
-- `auto`：自动检测系统语言（中文系统显示中文，英文系统显示英文）
-- `zh-CN`：强制中文
-- `en-US`：强制英文
-
-### 使用代理
-
+**使用代理：**
 ```json
-{
-  "proxy": "http://127.0.0.1:7890"
-}
+{ "proxy": "http://127.0.0.1:7890" }
 ```
 
 ---
@@ -264,181 +148,101 @@ Select: 1,2,5
 ## 📂 目录说明
 
 ```
-CloudreveDownloader/          # 主目录（可放在任意位置）
-├── 双击运行.cmd              # CMD 启动器（双击运行）
-├── cloudreve-downloader.ps1  # 主程序（PowerShell 脚本）
-├── README.md                 # 本说明文件
+CloudreveDownloader/
+├── 双击运行.cmd              # 启动器
+├── cloudreve-downloader.ps1  # 主程序
 ├── config.json               # 配置文件
-├── downloads/                # 默认下载目录
-├── logs/                     # 日志文件（每天一个）
-│   └── download-2026-04-26.log
-├── temp/                     # 临时文件（自动清理）
-└── tools/                    # 工具目录
-    └── aria2/                # 自动下载的 aria2（无需手动安装）
-        └── aria2c.exe
+├── downloads/                # 下载目录
+├── logs/                     # 日志
+├── temp/                     # 临时文件
+└── tools/aria2/              # 自动下载的 aria2
 ```
 
 ---
 
 ## ❓ 常见问题
 
-### Q: 双击 `双击运行.cmd` 后窗口一闪而过？
-**A:** 
-1. 检查网络连接（首次运行需要下载 aria2）
-2. 确保没有将工具放在包含中文或特殊字符的路径中
-3. 查看 `logs/` 目录下的日志文件排查错误
+### Q: 双击后窗口一闪而过？
+1. 检查网络（首次运行需下载 aria2）
+2. 路径不要含特殊字符
+3. 查看 `logs/` 排查错误
 
 ### Q: 提示 "aria2 not found"？
-**A:** 
-- **v3.2+ 版本**：脚本会自动下载 aria2，无需手动安装。如果自动下载失败：
-  1. 检查网络是否能访问 GitHub
-  2. 手动安装：`winget install aria2.aria2`
-  3. 重启 PowerShell
+- v3.2+ 会自动下载。若失败，手动安装：`winget install aria2.aria2`
 
 ### Q: 下载速度很慢？
-**A:** 
-- NekoGAL 使用 Cloudflare R2 存储，速度受限于 R2 的带宽和 Cloudflare 边缘节点
-- **推荐线程数**：NekoGAL 资源建议设置 `"defaultConnections": 32` 或更高
-- 尝试不同时段下载（晚间国际带宽可能较拥堵）
-- 如果使用代理，检查代理到 R2 的连通性
+- 建议线程数 32+（NekoGAL 的 R2 存储支持高并发）
+- 尝试不同时段下载
+- 检查代理连通性
 
-### Q: NekoGAL 下载提示 "403 Access Denied"？
-**A:** 
-- 这是 v3.1 已修复的问题。旧版本 aria2 的 User-Agent 会被 R2 拦截
-- 升级到 v3.1+，脚本会自动使用浏览器级请求头
-- 如果仍有问题，检查是否使用了代理/VPN（部分代理 IP 会被 Cloudflare 限制）
+### Q: 403 Access Denied？
+- v3.1+ 已修复。如仍有问题，检查是否使用代理/VPN
 
-### Q: NekoGAL 文件名显示乱码或下载失败？
-**A:** 
-- v3.1 已强制使用 UTF-8 编码，修复了不同系统区域设置导致的乱码问题
-- 如果文件名包含特殊字符（如 `☆`、`！`），确保脚本版本 ≥ v3.1
-- 旧版 Windows 可能需要更新 PowerShell 或 .NET Framework
+### Q: 文件名乱码？
+- v3.1+ 强制 UTF-8，已修复。旧版 Windows 请更新 PowerShell
 
-### Q: 文件名显示乱码？
-**A:** 
-- 脚本已自动处理编码问题
-- 如果仍有问题，尝试在 PowerShell 中执行：`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`
-
-### Q: 下载中断后如何继续？
-**A:** 
+### Q: 下载中断如何继续？
 - 重新运行脚本，选择相同文件
-- 脚本会自动检测到已下载的部分，跳过已完成的部分
-- 如果文件不完整，会自动重新下载
+- 脚本自动检测 `.aria2` 控制文件并恢复下载
 
 ### Q: 可以下载文件夹吗？
-**A:** 
-- 可以。脚本会列出文件夹内所有文件
-- 输入 `all` 下载全部，或输入编号如 `1,3,5` 选择性下载
-- 文件是**串行下载**（一个接一个），避免占用过多资源
+- 可以。脚本自动递归展开子目录，输入 `all` 下载全部
 
-### Q: 日志文件在哪里？
-**A:** 
-- 在 `logs/` 目录下，按日期命名（如 `download-2026-04-26.log`）
-- 如果不需要日志，将 `config.json` 中的 `logEnabled` 设为 `false`
-
-### Q: 可以放在 U 盘里使用吗？
-**A:** 
-- **完全可以！** 本工具是绿色软件，无需安装
-- 将 `CloudreveDownloader` 文件夹复制到 U 盘任意位置
-- 在任何 Windows 电脑上双击 `双击运行.cmd` 即可使用
-- 下载的文件默认保存在 U 盘的 `downloads` 文件夹中
+### Q: 可以放在 U 盘使用吗？
+- **可以**。绿色便携，复制到 U 盘即可在任何 Windows 电脑上使用
 
 ---
 
 ## 🔧 高级用法
 
-### 命令行参数
-
 ```powershell
-# 查看帮助
-Get-Help .\cloudreve-downloader.ps1 -Full
+# 交互模式
+.\cloudreve-downloader.ps1
 
-# 下载 NekoGAL 资源（推荐参数）
-.\cloudreve-downloader.ps1 `
-    -ShareLink "https://pan.nekogal.top/s/xxxxx" `
-    -OutputDir "D:\NekoGAL" `
-    -Aria2Connections 32
+# 直接传入链接
+.\cloudreve-downloader.ps1 -ShareLink "https://pan.nekogal.top/s/xxxxx"
+
+# 指定目录和线程数
+.\cloudreve-downloader.ps1 -ShareLink "..." -OutputDir "D:\Downloads" -Aria2Connections 32
 ```
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `-ShareLink` | string | 否 | 分享链接，不提供则交互输入 |
-| `-OutputDir` | string | 否 | 下载目录，默认使用配置文件 |
-| `-Aria2Connections` | int | 否 | 线程数，默认使用配置文件 |
 
 ### 推荐线程数
 
-#### NekoGAL 资源下载推荐
-
-| 网络环境 | 推荐线程数 | 说明 |
-|----------|-----------|------|
-| 100M 宽带 | 16-24 | R2 存储对多线程友好 |
-| 500M 宽带 | 24-32 | 推荐设置，兼顾速度和稳定性 |
+| 网络环境 | 推荐线程 | 说明 |
+|----------|---------|------|
+| 100M 宽带 | 16-24 | R2 对多线程友好 |
+| 500M 宽带 | 24-32 | 推荐设置 |
 | 1000M 宽带 | 32-64 | 充分利用带宽 |
-| 代理/VPN | 8-16 | 代理本身可能成为瓶颈 |
-
-#### 通用推荐
-
-| 网络环境 | 推荐线程数 |
-|----------|-----------|
-| 100M 宽带 | 8-16 |
-| 500M 宽带 | 16-32 |
-| 1000M 宽带 | 32-64 |
-| 代理/VPN | 8-16 |
-
-**注意：** 线程数不是越大越好，过多可能导致服务器限速。NekoGAL 的 R2 存储通常支持较高并发。
+| 代理/VPN | 8-16 | 代理可能成为瓶颈 |
 
 ---
 
 ## 📝 更新日志
 
 ### v3.2 (2026-04-28)
-- ✨ **自动安装 aria2** - 首次运行时自动从 GitHub 下载 aria2，无需用户手动安装
-- ✨ **多语言支持** - 默认中文，自动适配系统语言，config.json 可切换 `zh-CN`/`en-US`
-- ✨ **递归目录下载** - 自动展开子文件夹，保留原始目录结构
-- ✨ **断点续传** - 下载中断后自动检测 `.aria2` 控制文件并恢复下载
-- ✨ **文件名安全处理** - 自动替换 Windows 非法字符（`\ / : * ? " < > |`），处理保留名（CON、PRN 等）
-- 🔧 修复单文件分享列表显示异常问题
-- 🔧 修复 `home?path=` 链接中 Share ID 含编码字符时的解析失败
-- 🔧 修复切换位置后 Logger 未初始化导致的崩溃
+- ✨ **自动安装 aria2** - 首次运行自动下载，优先 winget，失败 fallback GitHub
+- ✨ **多语言支持** - 默认中文，config.json 切换 `zh-CN`/`en-US`
+- ✨ **递归目录下载** - 自动展开子文件夹，保留目录结构
+- ✨ **断点续传** - 检测 `.aria2` 控制文件，中断后自动恢复
+- ✨ **文件名安全处理** - 替换 Windows 非法字符，处理保留名
+- 🔧 修复单文件列表显示异常、Share ID 编码解析、Logger 空引用崩溃
 
 ### v3.1 (2026-04-26)
-- ✨ **NekoGAL 深度优化** - 针对 Cloudflare R2 存储后端进行专门适配
-- ✨ **跨环境兼容** - 修复不同 Windows 机器上的编码、TLS、PowerShell 版本差异问题
-- ✨ **浏览器级请求模拟** - 自动添加 Chrome User-Agent 和请求头，避免 WAF 拦截
-- ✨ **诊断增强** - 自动保存 aria2 失败日志，方便排查网络问题
-- 🔧 修复 aria2 参数解析错误（含空格的值未正确引号包裹）
-- 🔧 修复 URL 预检误报（S3/R2 对 HEAD 请求返回 403）
-- 🔧 自动创建 temp 目录，避免目录缺失导致下载失败
+- ✨ NekoGAL 深度优化：R2 存储适配、浏览器级请求头、跨环境兼容
+- 🔧 修复 aria2 参数解析、URL 预检误报、temp 目录缺失
 
 ### v3.0 (2026-04-26)
-- ✨ 全新界面：实时进度条和速度显示
-- ✨ 安全退出：Ctrl+C 自动清理临时文件
-- ✨ 配置文件：支持自定义设置
-- ✨ 磁盘检查：自动检测剩余空间
-- ✨ 日志记录：方便排查问题
-- ✨ 自动重试：链接过期自动刷新
-- ✨ 绿色便携：支持任意位置运行
-- 🔧 修复 Unicode 文件名下载失败问题
-- 🔧 修复路径重复导致的下载错误
+- ✨ 全新界面、安全退出、配置文件、磁盘检查、日志记录、自动重试
 
 ---
 
 ## ⚠️ 注意事项
 
-1. **链接有效期** - Cloudreve 分享的临时下载链接有效期约 1 小时，脚本会自动刷新
-2. **磁盘空间** - 下载前确保磁盘有足够空间，脚本会自动检查
-3. **杀毒软件** - 部分杀毒软件可能误报 PowerShell 脚本，请添加信任
-4. **版权归原作者** - 本工具仅用于下载自己有权访问的文件，请遵守相关法律法规
-
----
-
-## 📜 开源协议
-
-本项目仅供学习交流使用。请遵守 Cloudreve 服务条款和相关法律法规。
+1. **链接有效期** - Cloudreve 临时下载链接约 1 小时有效，脚本自动刷新
+2. **磁盘空间** - 下载前自动检查，确保有足够空间
+3. **杀毒软件** - 部分杀软可能误报 PowerShell 脚本，请添加信任
+4. **版权归原作者** - 本工具仅供下载自己有权访问的文件
 
 ---
 
 **Made with ❤️ for [NekoGAL](https://www.nekogal.com/) & Cloudreve users**
-
-> 如果在 NekoGAL 下载遇到问题，欢迎提交 Issue 反馈，我们会优先处理 NekoGAL 相关兼容性问题。

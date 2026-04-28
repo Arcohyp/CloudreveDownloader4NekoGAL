@@ -209,6 +209,13 @@ $script:LangDict = @{
         "type"                      = "类型"
         "dir_label"                 = "[目录]"
         "file_label"                = "[文件]"
+        "testing_url"               = "正在测试 URL 可访问性..."
+        "url_accessible"            = "URL 可访问 (HTTP {0})"
+        "url_returned_http"         = "URL 返回 HTTP {0}"
+        "url_precheck_403"          = "URL 预检返回 HTTP 403（某些存储后端正常），将继续尝试下载"
+        "url_blocked_401"           = "URL 被阻止: HTTP 401 (未授权)，下载令牌可能已过期"
+        "tls_ssl_error"             = "TLS/SSL 错误: {0}，请尝试更新 .NET Framework 或启用 TLS 1.2"
+        "url_test_failed"           = "URL 测试失败: {0}"
     }
     "en-US" = @{
         "aria2_not_found"           = "aria2 not found! Attempting automatic installation..."
@@ -280,11 +287,18 @@ $script:LangDict = @{
         "type"                      = "Type"
         "dir_label"                 = "[DIR]"
         "file_label"                = "[FILE]"
+        "testing_url"               = "Testing URL accessibility..."
+        "url_accessible"            = "URL is accessible (HTTP {0})"
+        "url_returned_http"         = "URL returned HTTP {0}"
+        "url_precheck_403"          = "URL pre-check returned HTTP 403 (this is normal for some storage backends). Will attempt download anyway."
+        "url_blocked_401"           = "URL blocked: HTTP 401 (Unauthorized). The download token may have expired."
+        "tls_ssl_error"             = "TLS/SSL error: {0}. Try updating .NET Framework or enabling TLS 1.2."
+        "url_test_failed"           = "URL test failed: {0}"
     }
 }
 
 function L {
-    param([string]$key, [array]$args)
+    param([string]$key, [array]$formatArgs)
     $lang = if ($script:Config -and $script:Config.language) { $script:Config.language } else { "auto" }
     if ($lang -eq "auto") {
         $uiLang = (Get-UICulture).Name
@@ -292,8 +306,8 @@ function L {
     }
     $dict = if ($script:LangDict.ContainsKey($lang)) { $script:LangDict[$lang] } else { $script:LangDict["zh-CN"] }
     $text = if ($dict.ContainsKey($key)) { $dict[$key] } else { $key }
-    if ($args -and $args.Count -gt 0) {
-        return ($text -f $args)
+    if ($formatArgs -and $formatArgs.Count -gt 0) {
+        return ($text -f $formatArgs)
     }
     return $text
 }
@@ -596,7 +610,7 @@ function Expand-FileList {
 function Test-UrlAccessibility {
     param([string]$url, [string]$referer)
 
-    Write-Info "Testing URL accessibility..."
+    Write-Info (L "testing_url")
     try {
         $req = [System.Net.WebRequest]::Create($url)
         # Use GET instead of HEAD - some S3-compatible storage returns 403 on HEAD but 200 on GET
@@ -613,10 +627,10 @@ function Test-UrlAccessibility {
         $response.Close()
 
         if ($status -eq 200 -or $status -eq 206 -or $status -eq 302 -or $status -eq 307) {
-            Write-Success "URL is accessible (HTTP $status)"
+            Write-Success (L "url_accessible" -f $status)
             return $true
         } else {
-            Write-Warn "URL returned HTTP $status"
+            Write-Warn (L "url_returned_http" -f $status)
             return $false
         }
     } catch [System.Net.WebException] {
@@ -627,17 +641,17 @@ function Test-UrlAccessibility {
         $errorMsg = $_.Exception.Message
 
         if ($statusCode -eq 403) {
-            Write-Info "URL pre-check returned HTTP 403 (this is normal for some storage backends). Will attempt download anyway."
+            Write-Info (L "url_precheck_403")
         } elseif ($statusCode -eq 401) {
-            Write-Warn "URL blocked: HTTP 401 (Unauthorized). The download token may have expired."
+            Write-Warn (L "url_blocked_401")
         } elseif ($errorMsg -match "SSL" -or $errorMsg -match "TLS") {
-            Write-Warn "TLS/SSL error: $errorMsg. Try updating .NET Framework or enabling TLS 1.2."
+            Write-Warn (L "tls_ssl_error" -f $errorMsg)
         } else {
-            Write-Warn "URL test failed: $errorMsg"
+            Write-Warn (L "url_test_failed" -f $errorMsg)
         }
         return $false
     } catch {
-        Write-Warn "URL test failed: $_"
+        Write-Warn (L "url_test_failed" -f $_)
         return $false
     }
 }

@@ -7,5 +7,5 @@
   "checkDiskSpace": true,
   "minFreeSpaceGB": 2,
   "proxy": "",
-  "language": "auto"
+  "language": "zh-CN"
 }
