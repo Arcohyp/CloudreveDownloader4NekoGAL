@@ -216,6 +216,15 @@ $script:LangDict = @{
         "url_blocked_401"           = "URL 被阻止: HTTP 401 (未授权)，下载令牌可能已过期"
         "tls_ssl_error"             = "TLS/SSL 错误: {0}，请尝试更新 .NET Framework 或启用 TLS 1.2"
         "url_test_failed"           = "URL 测试失败: {0}"
+        "aria2_exit_3"              = "远程文件不存在 (HTTP 404)"
+        "aria2_exit_7"              = "请求被拒绝 (HTTP 403)，分享链接可能已过期"
+        "aria2_exit_15"             = "写入文件权限不足，请以管理员身份运行或更换下载目录"
+        "aria2_exit_16"             = "DNS 解析失败，请检查网络连接"
+        "aria2_exit_18"             = "连接超时，请检查网络或代理设置"
+        "aria2_exit_21"             = "SSL/TLS 握手失败，请尝试更新 .NET Framework"
+        "aria2_exit_22"             = "HTTP 响应错误，服务器返回了非预期状态码"
+        "aria2_exit_24"             = "未授权 (HTTP 401)，下载令牌已过期"
+        "aria2_exit_unknown"        = "未知错误 (aria2 退出码 {0})"
     }
     "en-US" = @{
         "aria2_not_found"           = "aria2 not found! Attempting automatic installation..."
@@ -294,6 +303,15 @@ $script:LangDict = @{
         "url_blocked_401"           = "URL blocked: HTTP 401 (Unauthorized). The download token may have expired."
         "tls_ssl_error"             = "TLS/SSL error: {0}. Try updating .NET Framework or enabling TLS 1.2."
         "url_test_failed"           = "URL test failed: {0}"
+        "aria2_exit_3"              = "Remote file not found (HTTP 404)"
+        "aria2_exit_7"              = "Request denied (HTTP 403), share link may have expired"
+        "aria2_exit_15"             = "Insufficient write permission, try running as admin or change output dir"
+        "aria2_exit_16"             = "DNS resolution failed, check network connection"
+        "aria2_exit_18"             = "Connection timeout, check network or proxy settings"
+        "aria2_exit_21"             = "SSL/TLS handshake failed, try updating .NET Framework"
+        "aria2_exit_22"             = "HTTP response error, server returned unexpected status"
+        "aria2_exit_24"             = "Unauthorized (HTTP 401), download token expired"
+        "aria2_exit_unknown"        = "Unknown error (aria2 exit code {0})"
     }
 }
 
@@ -665,6 +683,24 @@ function Format-Size {
     return "$size B"
 }
 
+function Get-Aria2ErrorDescription {
+    param([int]$exitCode)
+    $known = @{
+        3  = "aria2_exit_3"
+        7  = "aria2_exit_7"
+        15 = "aria2_exit_15"
+        16 = "aria2_exit_16"
+        18 = "aria2_exit_18"
+        21 = "aria2_exit_21"
+        22 = "aria2_exit_22"
+        24 = "aria2_exit_24"
+    }
+    if ($known.ContainsKey($exitCode)) {
+        return (L $known[$exitCode])
+    }
+    return (L "aria2_exit_unknown" -f $exitCode)
+}
+
 function Format-Speed {
     param([long]$bytesPerSec)
     if ($bytesPerSec -gt 1GB) { return "{0:N2} GB/s" -f ($bytesPerSec / 1GB) }
@@ -895,7 +931,8 @@ function Start-FileDownload {
             return 1
         }
     } else {
-        Write-Err (L "download_failed" -f $process.ExitCode)
+        $aria2Desc = Get-Aria2ErrorDescription -exitCode $process.ExitCode
+        Write-Err "$aria2Desc"
         if ($errorDetails) {
             Write-Err "Details:"
             Write-Host $errorDetails -ForegroundColor DarkGray
@@ -986,6 +1023,8 @@ if (-not $files -or $files.Count -eq 0) { Write-Err (L "no_files_found"); exit 1
 if ($files.Count -eq 1) {
     $selected = @($files[0])
     Write-Success (L "single_file_auto")
+    Write-Host "  [$(L "file_label")] $($files[0].name) ($(Format-Size -size $files[0].size))" -ForegroundColor White
+    Write-Host ""
 } else {
     Write-Host ""
     Write-Host "$(L "file_list") ($($files.Count))" -ForegroundColor Cyan
@@ -996,7 +1035,6 @@ if ($files.Count -eq 1) {
         Write-Host "  [$($i+1)] [$(L "file_label")] $displayName ($(Format-Size -size $f.size))" -ForegroundColor White
     }
     Write-Host ""
-    Write-Host (L "select_files") -ForegroundColor Cyan
     $sel = Read-Host (L "select_files")
     if ($sel -eq "all") { $selected = $files }
     else {
