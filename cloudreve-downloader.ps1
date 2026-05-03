@@ -702,7 +702,11 @@ function Show-Progress {
         [long]$Speed,
         [string]$FileName
     )
-    $percent = [math]::Min(100, [math]::Round(($Current / $Total) * 100, 1))
+    if ($Total -le 0) {
+        $percent = if ($Current -gt 0) { 100 } else { 0 }
+    } else {
+        $percent = [math]::Min(100, [math]::Round(($Current / $Total) * 100, 1))
+    }
     $barWidth = 40
     $filled = [math]::Round($barWidth * $percent / 100)
     $empty = $barWidth - $filled
@@ -740,6 +744,8 @@ function Start-FileDownload {
     $urlAccessible = Test-UrlAccessibility -url $url -referer $domain
     
     # Build aria2 args
+    # Paths and filenames are wrapped in quotes so spaces in BaseDir / OutputDir
+    # don't cause aria2 to mis-parse arguments (e.g. "D:\Game Tools\downloads").
     $ariaArgs = @(
         "-x", "$conn",
         "-s", "$conn",
@@ -749,9 +755,9 @@ function Start-FileDownload {
         "--max-connection-per-server=$conn",
         "--min-split-size=1M",
         "--log-level=notice",
-        "--log=$relativeLog",
-        "--dir", "$outDir",
-        "--out", "$tempFileName",
+        "--log=`"$relativeLog`"",
+        "--dir=`"$outDir`"",
+        "--out=`"$tempFileName`"",
         # Browser-like headers to avoid being blocked by R2/WAF
         '--user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"',
         '--header="Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"',
@@ -809,17 +815,18 @@ function Start-FileDownload {
     
     # Track progress
     $startTime = Get-Date
-    
+    $startSize = if (Test-Path $tempPath) { (Get-Item $tempPath -ErrorAction SilentlyContinue).Length } else { 0 }
+
     # Start process
     [void]$process.Start()
     $process.BeginOutputReadLine()
     $process.BeginErrorReadLine()
     $script:ActiveDownloads += $process
-    
+
     # Monitor progress
     while (-not $process.HasExited) {
         Check-Interrupt
-        
+
         # Check temp file size for progress
         if (Test-Path $tempPath) {
             try {
@@ -827,13 +834,16 @@ function Start-FileDownload {
                 if ($currentSize -gt 0) {
                     $elapsed = ((Get-Date) - $startTime).TotalSeconds
                     if ($elapsed -gt 0) {
-                        $speed = [long]($currentSize / $elapsed)
+                        # Speed is bytes downloaded *this session*, not total file size,
+                        # otherwise resumed downloads display a fake huge speed initially.
+                        $sessionBytes = [math]::Max(0, $currentSize - $startSize)
+                        $speed = [long]($sessionBytes / $elapsed)
                         Show-Progress -Current $currentSize -Total $fileSize -Speed $speed -FileName $fileName
                     }
                 }
             } catch {}
         }
-        
+
         Start-Sleep -Milliseconds 500
     }
     
@@ -1070,13 +1080,12 @@ foreach ($file in $selected) {
         }
         
         $code = Start-FileDownload -url $url -outPath $out -fileSize $file.size -conn $Aria2Connections -domain $domain
-        
+
         if ($code -eq 0 -and (Test-Path $out) -and (Get-Item $out).Length -eq $file.size) {
             Write-Success (L "download_completed")": $displayName"
             $success++
             $done = $true
         } else {
-            Write-Warn (L "download_failed" -f ($retry + 1))
             $retry++
             if ($retry -lt $maxRetry) {
                 Write-Info (L "waiting_retry")
