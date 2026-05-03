@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul
 title Cloudreve Downloader v3.2
 cd /d "%~dp0"
