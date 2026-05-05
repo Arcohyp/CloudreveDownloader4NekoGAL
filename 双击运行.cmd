@@ -1,9 +1,9 @@
 @echo off
 chcp 65001 >nul
-title Cloudreve Downloader v3.2
+title NekoDown v3.2
 cd /d "%~dp0"
 echo ========================================
-echo   Cloudreve Downloader v3.2.0
+echo   NekoDown v3.2.0
 echo ========================================
 echo.
 
@@ -18,4 +18,4 @@ if errorlevel 1 (
 :: Run PowerShell script with -NoExit to keep window open
 echo [INFO] Starting download tool...
 echo.
-powershell -NoExit -ExecutionPolicy Bypass -File "cloudreve-downloader.ps1"
+powershell -NoExit -ExecutionPolicy Bypass -File "neko-down.ps1"

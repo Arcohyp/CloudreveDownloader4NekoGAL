@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-    Cloudreve Share Downloader v3.0
+    NekoDown v3.0
 
 .DESCRIPTION
     Auto-parse Cloudreve v4 share links and download with aria2 multi-threading.
@@ -25,10 +25,10 @@
     aria2 connection count (overrides config)
 
 .EXAMPLE
-    .\cloudreve-downloader.ps1
+    .\neko-down.ps1
 
 .EXAMPLE
-    .\cloudreve-downloader.ps1 -ShareLink "https://pan.nekogal.top/s/yE4u7"
+    .\neko-down.ps1 -ShareLink "https://pan.nekogal.top/s/yE4u7"
 #>
 
 [CmdletBinding()]
@@ -961,7 +961,7 @@ function Start-FileDownload {
 try {
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Magenta
-Write-Host "  Cloudreve Downloader v$script:Version" -ForegroundColor Magenta
+Write-Host "  NekoDown v$script:Version" -ForegroundColor Magenta
 Write-Host "========================================" -ForegroundColor Magenta
 Write-Host ""
 

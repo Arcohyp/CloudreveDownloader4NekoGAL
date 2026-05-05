@@ -1,4 +1,4 @@
-# Cloudreve Downloader v3.2
+# NekoDown v3.2
 
 **专为 NekoGAL 优化的 Cloudreve 分享链接一键下载工具**
 
@@ -26,7 +26,7 @@
 
 ### 1. 获取工具
 
-将 `CloudreveDownloader` 文件夹解压/复制到任意位置（桌面、U 盘均可）。
+将 `NekoDown` 文件夹解压/复制到任意位置（桌面、U 盘均可）。
 
 > **注意：** 可以放在**任何位置**，脚本会自动检测所在目录。
 
@@ -39,8 +39,8 @@
 **方式二：命令行**
 
 ```powershell
-cd C:\CloudreveDownloader
-.\cloudreve-downloader.ps1
+cd C:\NekoDown
+.\neko-down.ps1
 ```
 
 > **aria2 会自动下载** - 首次运行时脚本会自动从 GitHub 下载 aria2 到 `tools/aria2/` 目录。如果自动下载失败，可手动安装：`winget install aria2.aria2`
@@ -77,7 +77,7 @@ https://pan.xxx.com/s/xxxxx
 
 ```
 ========================================
-  Cloudreve Downloader v3.2.0
+  NekoDown v3.2.0
 ========================================
 
 [OK]   aria2 已就绪
@@ -112,7 +112,7 @@ Link: https://pan.nekogal.top/s/yE4u7
 
 ```json
 {
-  "defaultOutputDir": "C:\\CloudreveDownloader\\downloads",
+  "defaultOutputDir": "C:\\NekoDown\\downloads",
   "defaultConnections": 16,
   "autoRetry": true,
   "maxRetries": 3,
@@ -148,14 +148,14 @@ Link: https://pan.nekogal.top/s/yE4u7
 ## 📂 目录说明
 
 ```
-CloudreveDownloader/
-├── 双击运行.cmd              # 启动器
-├── cloudreve-downloader.ps1  # 主程序
-├── config.json               # 配置文件
-├── downloads/                # 下载目录
-├── logs/                     # 日志
-├── temp/                     # 临时文件
-└── tools/aria2/              # 自动下载的 aria2
+NekoDown/
+├── 双击运行.cmd      # 启动器
+├── neko-down.ps1     # 主程序
+├── config.json       # 配置文件
+├── downloads/        # 下载目录
+├── logs/             # 日志
+├── temp/             # 临时文件
+└── tools/aria2/      # 自动下载的 aria2
 ```
 
 ---
@@ -197,13 +197,13 @@ CloudreveDownloader/
 
 ```powershell
 # 交互模式
-.\cloudreve-downloader.ps1
+.\neko-down.ps1
 
 # 直接传入链接
-.\cloudreve-downloader.ps1 -ShareLink "https://pan.nekogal.top/s/xxxxx"
+.\neko-down.ps1 -ShareLink "https://pan.nekogal.top/s/xxxxx"
 
 # 指定目录和线程数
-.\cloudreve-downloader.ps1 -ShareLink "..." -OutputDir "D:\Downloads" -Aria2Connections 32
+.\neko-down.ps1 -ShareLink "..." -OutputDir "D:\Downloads" -Aria2Connections 32
 ```
 
 ### 推荐线程数
